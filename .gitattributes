@@ -1,0 +1,2 @@
+# GitHub 파일 한도(100MB)를 넘는 경계 파일은 Git LFS로 관리
+S-Sim_데이터팩/**/00_경계/*.gpkg filter=lfs diff=lfs merge=lfs -text
