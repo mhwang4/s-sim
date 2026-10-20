@@ -1,0 +1,743 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>공간구조 시뮬레이션 분석도구 — 플러그인 설명자료</title>
+<style>
+/* KoPubWorld돋움 — 굵기별 개별 패밀리를 local()로 묶음 (오프라인 동작) */
+@font-face{font-family:"KoPub Dotum";src:local("KoPubWorldDotum Light"),local("KoPubWorld Dotum Light");font-weight:100 300}
+@font-face{font-family:"KoPub Dotum";src:local("KoPubWorldDotum Medium"),local("KoPubWorld Dotum Medium");font-weight:400 600}
+@font-face{font-family:"KoPub Dotum";src:local("KoPubWorldDotum Bold"),local("KoPubWorld Dotum Bold");font-weight:700 900}
+:root{
+  --bg:#f4f5f7;--card:#ffffff;--ink:#1a1d23;--sub:#5b6270;--line:#e2e5ea;
+  --acc:#c2620e;--acc2:#1f5aa8;--soft:#fbf1e8;--soft2:#eaf1fb;--mute:#f0f2f5;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:"KoPub Dotum","Malgun Gothic","맑은 고딕",sans-serif;background:var(--bg);color:var(--ink);line-height:1.65;font-size:17px}
+.wrap{width:min(1500px,94vw);margin:0 auto}
+
+/* ── 헤더 ── */
+.hero{background:linear-gradient(135deg,#1e222a 0%,#2b3340 100%);color:#fff;padding:56px 0 44px}
+.hero .eyebrow{color:#f0b27a;font-size:14px;letter-spacing:.06em;font-weight:700;text-transform:uppercase}
+.hero h1{font-size:44px;font-weight:700;letter-spacing:-.02em;line-height:1.25;margin:10px 0 12px}
+.hero .lead{color:#c8ceda;font-size:20px;max-width:900px}
+.hero .flows{display:flex;align-items:stretch;justify-content:center;flex-wrap:wrap;gap:10px 0;margin:32px 0 8px}
+.hero .flow{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:0 22px}
+.hero .flow+.flow{border-left:1px solid rgba(255,255,255,.28)}
+.hero .flow .s{background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.25);border-radius:12px;padding:14px 22px;font-weight:600;font-size:17px}
+.hero .flow .s small{color:#aab2c0}
+.hero .flow .a{color:#8a93a3;font-size:22px}
+.hero .grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-top:28px}
+.hero .box{background:rgba(255,255,255,.08);border-radius:12px;padding:18px 22px;font-size:16px}
+.hero .box h4{font-size:14px;color:#f0b27a;margin-bottom:4px;font-weight:700}
+.hero .meta{margin-top:28px;color:#aab2c0;font-size:14px}
+
+/* ── 목차 ── */
+.toc{background:var(--card);border-bottom:1px solid var(--line);padding:26px 0 30px}
+.toc h3{font-size:15px;color:var(--sub);letter-spacing:.05em;font-weight:700;margin-bottom:14px}
+.toc .grps{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:18px}
+.toc .grp{border:1px solid var(--line);border-radius:10px;padding:13px 15px;background:var(--bg)}
+.toc .grp h4{font-size:14.5px;font-weight:700;margin-bottom:7px;padding-bottom:7px;border-bottom:1px solid var(--line)}
+.toc .grp h4 .no{color:var(--acc);font-size:12px;letter-spacing:.08em;margin-right:7px}
+.toc .grp ol{list-style:none}
+.toc a{display:block;color:var(--ink);text-decoration:none;padding:4px 7px;border-radius:6px;font-size:15px}
+.toc a:hover{background:var(--mute)}
+
+/* ── 부(部) 구분 밴드 — 부문이 바뀔 때 큰 여백 + 띠 ── */
+.band{margin-top:72px;padding:16px 0;background:#e8ebf0;border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
+.band:first-of-type{margin-top:0}
+.band .wrap{display:flex;gap:14px;align-items:baseline}
+.band .no{font-size:13px;font-weight:700;color:var(--acc);letter-spacing:.1em}
+.band h3{font-size:21px;font-weight:700;letter-spacing:-.01em}
+.band .sub{font-size:14px;color:var(--sub)}
+
+/* ── 섹션 공통 ── */
+section.sec{padding:48px 0 40px;border-bottom:1px solid var(--line)}
+section.sec.alt{background:var(--card)}
+.eyebrow{display:inline-block;font-size:13.5px;letter-spacing:.06em;color:var(--acc);font-weight:700;text-transform:uppercase}
+h2{font-size:28px;font-weight:700;letter-spacing:-.02em;line-height:1.3;margin:4px 0 18px}
+
+/* INPUT → 알고리즘 → OUTPUT 스트립 */
+.ipo{display:grid;grid-template-columns:1fr 32px 1.1fr 32px 1fr;align-items:stretch;margin:0 0 26px}
+.ipo .b{border-radius:10px;padding:12px 16px;font-size:15px;line-height:1.55}
+.ipo .in{background:var(--soft2);border:1.5px solid #b9cfec}
+.ipo .alg{background:var(--mute);border:1.5px solid var(--line)}
+.ipo .out{background:var(--soft);border:1.5px solid #e6c4a5}
+.ipo .b h5{font-size:12.5px;letter-spacing:.05em;font-weight:700;margin-bottom:3px}
+.ipo .in h5{color:var(--acc2)}.ipo .alg h5{color:var(--sub)}.ipo .out h5{color:var(--acc)}
+.ipo .ar{display:flex;align-items:center;justify-content:center;color:#9aa3b2;font-size:20px;font-weight:700}
+
+/* 본문 2단 */
+.duo{display:grid;grid-template-columns:1fr 1.15fr;gap:32px;align-items:start}
+figure{margin:0}
+figure img{width:100%;height:auto;border:1px solid var(--line);border-radius:10px;background:#fff}
+figcaption{text-align:center;font-size:13.5px;color:var(--sub);margin-top:6px}
+
+/* 번호 배지 — 목록 선두형(.keys 기본) + 문장 중간형(.bdg.in) 통일 */
+.bdg{display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;border-radius:50%;background:var(--acc);color:#fff;font-weight:700;font-size:14px;vertical-align:-.35em}
+.keys{list-style:none;padding:0;margin:0 0 18px}
+.keys li{position:relative;padding-left:38px;margin:11px 0;font-size:16px}
+.keys li>.bdg:first-child{position:absolute;left:0;top:2px}
+.bdg.in{position:static;margin:0 5px 0 2px}
+.keys b{color:var(--acc)}
+
+ul{padding-left:21px;margin:12px 0}
+li{margin:6px 0}
+li::marker{color:var(--acc)}
+table{width:100%;border-collapse:collapse;font-size:15px;margin:14px 0}
+th,td{border-bottom:1px solid var(--line);padding:9px 11px;text-align:left;vertical-align:top}
+th{background:var(--mute);font-weight:700;font-size:13.5px;color:var(--sub)}
+td:first-child{font-weight:700;white-space:nowrap}
+td.wrap{white-space:normal}
+.formula{background:var(--soft2);border:1px solid #cbdaf0;border-radius:9px;padding:12px 16px;margin:16px 0;font-size:15.5px;font-weight:600}
+.formula small{display:block;font-weight:400;color:var(--sub);margin-top:5px;font-size:13.5px}
+.tip{border:1px dashed #b9c2d0;border-radius:8px;padding:10px 14px;margin-top:16px;font-size:14.5px;color:var(--sub)}
+.tip b{color:var(--acc2);margin-right:5px}
+
+/* 입력 형식표 — 플러그인 [형식] 버튼과 동일 내용, 접이식 */
+.specs{margin-top:18px}
+.specs .cap{font-size:13px;font-weight:700;color:var(--sub);letter-spacing:.04em;margin-bottom:4px}
+details.spec{border:1px solid var(--line);border-radius:9px;background:var(--card);margin:7px 0}
+section.sec.alt details.spec{background:var(--bg)}
+.spec summary{cursor:pointer;padding:9px 13px;font-size:14.5px;font-weight:700;list-style:none;display:flex;gap:8px;align-items:baseline;flex-wrap:wrap}
+.spec summary::-webkit-details-marker{display:none}
+.spec summary::before{content:"▸";color:var(--acc);font-size:12px}
+.spec[open] summary::before{content:"▾"}
+.spec summary small{font-weight:400;color:var(--sub);font-size:12.5px}
+.spec .bd{padding:2px 13px 12px;overflow-x:auto}
+.spec .bd table{font-size:13px;margin:6px 0}
+.spec .bd th,.spec .bd td{padding:5px 8px;white-space:nowrap}
+.spec .bd td.wrap{white-space:normal;min-width:220px}
+.spec table.sample td{font-family:Consolas,"D2Coding",monospace;font-size:12px;font-weight:400;white-space:nowrap;color:var(--sub)}
+.spec table.sample tr:first-child td{font-weight:700;color:var(--ink);background:var(--mute)}
+.spec ul.note{margin:6px 0 0;padding-left:18px;font-size:12.5px;color:var(--sub)}
+.specs.cols{display:grid;grid-template-columns:1fr 1fr;gap:0 16px;align-items:start}
+code{font-family:Consolas,"D2Coding",monospace;font-size:.9em;background:var(--mute);padding:1px 5px;border-radius:4px}
+section.sec.alt code{background:var(--bg)}
+
+.top{position:fixed;right:20px;bottom:18px;font-size:13px;color:var(--sub);background:rgba(255,255,255,.9);border:1px solid var(--line);border-radius:999px;padding:6px 13px;text-decoration:none;backdrop-filter:blur(6px)}
+.top:hover{color:var(--ink)}
+
+@media print{
+  body{background:#fff;font-size:14px}
+  .hero,.band{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  .top{display:none}
+  section.sec{break-before:page;border-bottom:none;padding:24px 0}
+  .band{break-before:page;margin-top:0}
+  figure,.ipo,.formula,table,details.spec{break-inside:avoid}
+  .toc a{padding:2px 0}
+}
+@media (max-width:1000px){
+  .duo{grid-template-columns:1fr}
+  .specs.cols{grid-template-columns:1fr}
+  .ipo{grid-template-columns:1fr;gap:8px}.ipo .ar{display:none}
+  .hero .grid{grid-template-columns:repeat(2,1fr)}
+  .hero h1{font-size:34px}
+  .band{margin-top:48px}
+}
+</style>
+</head>
+<body id="top">
+
+<!-- 헤더 -->
+<header class="hero"><div class="wrap">
+  <span class="eyebrow">QGIS 플러그인 설명자료 · 2026</span>
+  <h1>공간구조 시뮬레이션 분석도구</h1>
+  <p class="lead" style="margin-bottom:2px;font-size:15px;color:#8a93a3">Spatial Structure Simulation Analysis Tool · v1.0.0</p>
+  <p class="lead">시군구 단위 장래인구 추계 한 장으로 격자 인구 지도부터 생활권 경계까지 — 통합 대화상자 플러그인.</p>
+  <div class="flows">
+    <div class="flow">
+      <span class="s">시군구 장래인구 추계</span><span class="a">→</span>
+      <span class="s">1km 격자 배분<br><small>BAU · 거점유도 · 계획인구</small></span><span class="a">→</span>
+      <span class="s">장래 중심지 식별</span>
+    </div>
+    <div class="flow">
+      <span class="s">장래 중심지 식별<br><small>연도별 위계</small></span><span class="a">→</span>
+      <span class="s">생활권 분석<br><small>위계 · 기초 · 상위</small></span>
+    </div>
+    <div class="flow">
+      <span class="s">3D 시각화</span>
+    </div>
+  </div>
+  <div class="grid">
+    <div class="box"><h4>인구 배분</h4><p>거주·근무 × 3시나리오 — 시군구 총량 보존</p></div>
+    <div class="box"><h4>장래 중심지 식별</h4><p>배분 결과 → 연도별 중심지 폴리곤·위계</p></div>
+    <div class="box"><h4>생활권 분석</h4><p>4개 통합 프로세스 — 버튼 하나로 연쇄 실행</p></div>
+    <div class="box"><h4>3D 시각화</h4><p>deck.gl HTML — 연도·회전·좌우 비교</p></div>
+  </div>
+  <p class="meta">국토연구원 국토모니터링연구센터 · QGIS 3.16+ (생활권 ④는 QNEAT3 필요) · 설치: 설치.bat · Ctrl+P 인쇄 시 섹션별 페이지</p>
+</div></header>
+
+<!-- 목차 -->
+<nav class="toc"><div class="wrap">
+  <h3>목차</h3>
+  <div class="grps">
+    <div class="grp"><h4><span class="no">PART 1</span>인구 배분</h4><ol>
+      <li><a href="#sec-common">공통 데이터</a></li>
+      <li><a href="#sec-bau">① BAU 배분</a></li>
+      <li><a href="#sec-anchor">② 거점유도 배분</a></li>
+      <li><a href="#sec-plan">③ 계획인구 반영 배분</a></li>
+    </ol></div>
+    <div class="grp"><h4><span class="no">PART 2</span>근무인구 배분</h4><ol>
+      <li><a href="#sec-work">근무인구 추계</a></li>
+    </ol></div>
+    <div class="grp"><h4><span class="no">PART 3</span>장래 중심지 분석</h4><ol>
+      <li><a href="#sec-center">장래 중심지 식별</a></li>
+    </ol></div>
+    <div class="grp"><h4><span class="no">PART 4</span>생활권 분석</h4><ol>
+      <li><a href="#sec-lz-common">공통 데이터</a></li>
+      <li><a href="#sec-tier">① 중심지 위계 분석</a></li>
+      <li><a href="#sec-odgen">② 중심지 중심점 생성</a></li>
+      <li><a href="#sec-basic">③ 기초생활권 도출</a></li>
+      <li><a href="#sec-upper">④ 상위생활권 도출</a></li>
+    </ol></div>
+    <div class="grp"><h4><span class="no">PART 5</span>시각화</h4><ol>
+      <li><a href="#sec-3d">3D 시각화</a></li>
+    </ol></div>
+    <div class="grp"><h4><span class="no">PART 6</span>데이터 탐색</h4><ol>
+      <li><a href="#sec-explore">격자 통계 탐색</a></li>
+    </ol></div>
+  </div>
+</div></nav>
+
+<!-- ═══ PART 1 인구 배분 ═══ -->
+<div class="band"><div class="wrap"><span class="no">PART 1</span><h3>인구 배분</h3><span class="sub">공통 데이터 → BAU · 거점유도 · 계획인구 반영</span></div></div>
+
+<!-- 1-0 공통 데이터 -->
+<section class="sec" id="sec-common"><div class="wrap">
+  <span class="eyebrow">인구 배분 · 공통 데이터</span>
+  <h2>격자 + 시군구 추계 테이블 — 한 번만 선택</h2>
+  <div class="ipo">
+    <div class="b in"><h5>INPUT</h5>1km 단위 격자 공간자료 + 시군구 장래인구 추계 테이블</div><div class="ar">→</div>
+    <div class="b alg"><h5>처리</h5>표준 검증 (필드·중복·시군구 일치 — 어긋나면 즉시 한글 에러) · 연도 자동 감지</div><div class="ar">→</div>
+    <div class="b out"><h5>OUTPUT</h5>이후 모든 배분 단계가 이 입력을 공유 — 단계 페이지엔 결과 저장 파일·실행 버튼만 남음</div>
+  </div>
+  <div class="duo">
+  <div class="txt">
+  <ul class="keys">
+    <li><span class="bdg">1</span><b>격자 파일</b> — 국토공간거점지도 1km. 필수 컬럼은 아래 형식표 참고</li>
+    <li><span class="bdg">2</span><b>필드 콤보</b> — 파일을 선택하면 필드 목록 자동 인식. 필드명이 표준과 달라도 여기서 골라주면 됨 (격자 ID·시군구 코드·기준연도 인구)</li>
+    <li><span class="bdg">3</span><b>추계 테이블</b> — 시군구 코드로 조인. 컬럼명은 <b>고정</b>(<code>sgg_cd_h</code>, <code>pop_YYYY</code>)</li>
+  </ul>
+  <ul>
+    <li>격자의 <b>모든 시군구</b>가 테이블에 있어야 함 → 격자를 대상 지역으로 미리 필터링.</li>
+    <li><b>총량 보존 원칙</b>: 어느 시나리오든 시군구별 pop_YYYY 합계 = 추계 값.</li>
+    <li>근무인구 쪽 추계 테이블 슬롯은 입력 불가 — 근무인구 추계 실행 시 자동 연결.</li>
+  </ul>
+  <div class="specs"><div class="cap">입력 형식 (플러그인 [형식] 버튼과 동일)</div>
+  <details class="spec"><summary>격자 레이어 <small>폴리곤 shp·gpkg · 국토공간거점지도</small></summary><div class="bd">
+    <table><tr><th>컬럼</th><th>타입</th><th>필수</th><th>설명</th></tr>
+    <tr><td>gid</td><td>문자</td><td>필수</td><td class="wrap">격자 고유 ID — 중복 금지</td></tr>
+    <tr><td>sgg_cd_h</td><td>정수</td><td>필수</td><td class="wrap">시군구 코드 — 추계 테이블과 같은 코드 체계</td></tr>
+    <tr><td>pop_r</td><td>숫자</td><td>필수</td><td class="wrap">기준연도 거주인구 (거주인구 배분 기준)</td></tr>
+    <tr><td>pop_w</td><td>숫자</td><td>근무 시 필수</td><td class="wrap">기준연도 근무인구 (근무인구 배분 기준)</td></tr>
+    <tr><td>type</td><td>문자</td><td>선택</td><td class="wrap">거점 유형 — 정책관심구역 산출에 사용</td></tr></table>
+    <table class="sample"><tr><td>gid</td><td>sgg_cd_h</td><td>pop_r</td><td>pop_w</td><td>type</td></tr>
+    <tr><td>다바4321</td><td>34010</td><td>1532.4</td><td>2210.0</td><td>중심지Ⅱ</td></tr>
+    <tr><td>다바4322</td><td>34010</td><td>87.0</td><td>31.0</td><td>주변부</td></tr></table>
+    <ul class="note"><li>필드명이 달라도 필드 콤보에서 선택 가능</li></ul>
+  </div></details>
+  <details class="spec"><summary>시군구 인구 추계 테이블 <small>csv·xlsx · 거주·근무 공통 형식</small></summary><div class="bd">
+    <table><tr><th>컬럼</th><th>타입</th><th>필수</th><th>설명</th></tr>
+    <tr><td>sgg_cd_h</td><td>정수</td><td>필수</td><td class="wrap">시군구 코드 — 격자와 같은 코드 체계, 중복 금지</td></tr>
+    <tr><td>pop_YYYY</td><td>숫자</td><td>필수</td><td class="wrap">연도별 목표 총인구(거주 또는 근무) — 1개 이상, 연도 자동 감지</td></tr>
+    <tr><td>sgg_nm</td><td>문자</td><td>선택</td><td class="wrap">시군구 명칭 (참고용)</td></tr></table>
+    <table class="sample"><tr><td>sgg_cd_h</td><td>sgg_nm</td><td>pop_2025</td><td>pop_2030</td><td>pop_2035</td><td>pop_2040</td></tr>
+    <tr><td>34010</td><td>천안시</td><td>658000</td><td>672000</td><td>680000</td><td>683000</td></tr>
+    <tr><td>34020</td><td>공주시</td><td>103000</td><td>99000</td><td>95000</td><td>91000</td></tr></table>
+    <ul class="note"><li>격자에 있는 모든 시군구가 이 테이블에 있어야 함 (없으면 에러)</li>
+    <li>컬럼명 고정 (sgg_cd_h·pop_YYYY) — 근무인구 추계도 같은 형식으로 변환해 사용</li></ul>
+  </div></details>
+  </div>
+  <div class="tip"><b>공통 규칙</b> [산식 보기] = 계산 방식. 경로는 재시작 후에도 기억. 완료 시 메뉴 ✓ 표시 후 다음 단계로 자동 이동.</div>
+  </div>
+  <figure><img src="docs_img/a_전체구조.png" alt="플러그인 전체 화면 — 공통 데이터 페이지"><figcaption>전체 화면 — 좌: 2단 메뉴(작업 순서) · 우: 기능 페이지 · 아래: 실행 로그. 번호는 왼쪽 설명과 대응</figcaption></figure>
+  </div>
+</div></section>
+
+<!-- 1-1 BAU -->
+<section class="sec alt" id="sec-bau"><div class="wrap">
+  <span class="eyebrow">인구 배분 ①</span>
+  <h2>BAU 배분 — 현상 유지 시나리오</h2>
+  <div class="ipo">
+    <div class="b in"><h5>INPUT</h5>공통 데이터의 격자 + 추계 테이블 (추가 입력 없음)</div><div class="ar">→</div>
+    <div class="b alg"><h5>알고리즘</h5>pop(g,y) = P(s,y) × w(g)/Σw · w = 기준연도 격자인구 — 분포 고정, 총량만 증감</div><div class="ar">→</div>
+    <div class="b out"><h5>OUTPUT</h5>연도별 배분 인구가 담긴 격자 자료 → 연도별 단계구분도 그룹 + 3D 슬롯 자동 연결</div>
+  </div>
+  <div class="duo">
+  <div class="txt">
+  <ul class="keys">
+    <li><span class="bdg">1</span><b>결과 저장 파일</b> — 비워두면 <code>분석결과\거주인구배분\</code>에 자동 저장</li>
+    <li><span class="bdg">2</span><b>실행</b> — 공통 데이터만 있으면 바로. 옆 [산식 보기]에 위 수식</li>
+  </ul>
+  <ul>
+    <li>가중치 합 0인 시군구(인구 전무)는 <b>균등 배분</b> + 경고.</li>
+    <li>지도 그룹은 연도별 레이어(0·100·200·500·1000·5000 고정 구간) — 마지막 연도만 켜짐.</li>
+    <li>역할: "지금 많은 곳이 미래에도 많다"는 <b>관성 기준선</b> — 거점유도·계획인구와 비교용.</li>
+  </ul>
+  <div class="tip"><b>검증</b> 실행 후 시군구별 pop_YYYY 합계가 추계 테이블과 일치하는지 확인 — 모든 배분 공통.</div>
+  </div>
+  <figure><img src="docs_img/a_BAU_거주.png" alt="BAU 배분 화면"><figcaption>① BAU 배분 — 입력 슬롯 두 개가 전부</figcaption></figure>
+  </div>
+</div></section>
+
+<!-- 1-2 거점유도 -->
+<section class="sec" id="sec-anchor"><div class="wrap">
+  <span class="eyebrow">인구 배분 ②</span>
+  <h2>거점유도 배분 — 정책관심구역 + 지수모형</h2>
+  <div class="ipo">
+    <div class="b in"><h5>INPUT</h5>공통 데이터 + 거점 정의 자료 (생활인프라 충족도 또는 기존 거점 목록)</div><div class="ar">→</div>
+    <div class="b alg"><h5>알고리즘</h5>거점 = 유형 ∪ 충족도 → w = ratio^지수 (거점 a·b, 비거점 c·d) 연도 연쇄</div><div class="ar">→</div>
+    <div class="b out"><h5>OUTPUT</h5>정책관심구역 + 거점유도 배분 격자 자료 → 지도 그룹(거점 경계 포함)</div>
+  </div>
+  <div class="duo">
+  <div class="txt">
+  <ul class="keys">
+    <li><span class="bdg">1</span><b>정책관심구역 파일</b> — 기존 거점 격자 파일이 있으면 여기에 직접 (gid만 매칭)</li>
+    <li><span class="bdg">2</span><b>생활인프라 파일</b> — 새로 산출할 때. 거점 유형 체크 + 충족도 기준(마을 Me_CI_1 ≥ 3 · 거점 Me_CI_2 ≥ 3)과 합집합</li>
+    <li><span class="bdg">3</span><b>정책관심구역 산출</b> — 결과가 <span class="bdg in">1</span>에 자동 연결</li>
+    <li><span class="bdg">4</span><b>지수 계수</b> — 기본값 a 1.1 · b 0.9 · c 0.9 · d 1.1. <b>1에 가까울수록 BAU에 수렴</b></li>
+    <li><span class="bdg">5</span><b>결과 저장 파일</b> · <span class="bdg in">6</span><b>배분 실행</b></li>
+  </ul>
+  <div class="formula">ratio(g) = 직전 시점 격자인구 ÷ 시군구 평균 → w(g) = ratio^지수 → 비례 배분
+  <small>a: 인구 많은 거점 집중 강화 · b: 적은 거점 감소 완화 · c: 많은 비거점 억제 · d: 적은 비거점 감소 강화 — 결과가 다음 연도 ratio로 연쇄</small></div>
+  <div class="specs"><div class="cap">입력 형식 (플러그인 [형식] 버튼과 동일)</div>
+  <details class="spec"><summary>정책관심구역 — 거점 격자 목록 <small>shp·gpkg</small></summary><div class="bd">
+    <table><tr><th>컬럼</th><th>타입</th><th>필수</th><th>설명</th></tr>
+    <tr><td>gid</td><td>문자</td><td>필수</td><td class="wrap">거점 격자 ID — 격자 레이어의 gid와 매칭</td></tr></table>
+    <table class="sample"><tr><td>gid</td><td>type</td></tr>
+    <tr><td>다바4321</td><td>중심지Ⅱ</td></tr><tr><td>다바5100</td><td>중심지Ⅰ</td></tr></table>
+    <ul class="note"><li>이 레이어에 있는 gid = 거점, 없으면 비거점 (gid 외 컬럼 무시)</li>
+    <li>지오메트리 불필요 — 테이블만 있어도 됨</li>
+    <li><span class="bdg in">3</span> 정책관심구역 산출로 새로 만들 수도 있음</li></ul>
+  </div></details>
+  <details class="spec"><summary>생활인프라 충족도 레이어 <small>폴리곤 shp·gpkg</small></summary><div class="bd">
+    <table><tr><th>컬럼</th><th>타입</th><th>필수</th><th>설명</th></tr>
+    <tr><td>GRID_1K_CD</td><td>문자</td><td>필수</td><td class="wrap">격자 ID — 격자 레이어의 gid와 매칭</td></tr>
+    <tr><td>Me_CI_1</td><td>숫자</td><td>필수</td><td class="wrap">마을시설 충족도 (0~10)</td></tr>
+    <tr><td>Me_CI_2</td><td>숫자</td><td>필수</td><td class="wrap">거점시설 충족도 (0~10)</td></tr></table>
+    <table class="sample"><tr><td>GRID_1K_CD</td><td>Me_CI_1</td><td>Me_CI_2</td></tr>
+    <tr><td>다바4321</td><td>4.2</td><td>3.1</td></tr><tr><td>다바4322</td><td>1.0</td><td>0.5</td></tr></table>
+    <ul class="note"><li>국토모니터링 국토생활인프라(20종) 기준 필드명</li>
+    <li>미지정 시 거점 유형 필터만 적용</li></ul>
+  </div></details>
+  </div>
+  </div>
+  <figure><img src="docs_img/a_거점유도.png" alt="거점유도 배분 화면"><figcaption>② 거점유도 — 위: 거점 정의 · 아래: 배분 실행</figcaption></figure>
+  </div>
+</div></section>
+
+<!-- 1-3 계획인구 -->
+<section class="sec alt" id="sec-plan"><div class="wrap">
+  <span class="eyebrow">인구 배분 ③</span>
+  <h2>계획인구 반영 배분 — 개발·비개발 분리</h2>
+  <div class="ipo">
+    <div class="b in"><h5>INPUT</h5>공통 데이터 + 개발사업 지구 경계 자료 (계획인구·준공연도 포함)</div><div class="ar">→</div>
+    <div class="b alg"><h5>알고리즘</h5>계획인구를 KOTI 입주율로 연도 분산 → 개발격자 균등 + 비개발 비례, 연도 연쇄</div><div class="ar">→</div>
+    <div class="b out"><h5>OUTPUT</h5>계획인구 반영 배분 격자 자료 + 개발·비개발 분배 내역 → 지도 그룹(사업지 경계 포함)</div>
+  </div>
+  <div class="duo">
+  <div class="txt">
+  <ul class="keys">
+    <li><span class="bdg">1</span><b>개발사업 지구 파일</b> — <b>1피처 = 1사업</b>. 형식은 아래 표 참고</li>
+    <li><span class="bdg">2</span><b>필드 콤보</b> — 계획인구·준공연도(필수), 사업 전체 인구합·관할 시군(선택)을 드롭다운으로 지정</li>
+    <li><span class="bdg">3</span><b>결과 저장 파일</b> · <span class="bdg in">4</span><b>분배 CSV 저장 파일</b> — 비우면 자동 경로</li>
+    <li><span class="bdg">5</span><b>실행</b></li>
+  </ul>
+  <div class="formula">입주율: 10만↑ 30/20/20/20/10% · 5만~10만 50/20/15/15% · 5만 미만 75/15/10%
+  <small>유입연도는 다음 목표연도로(2028→2030) · 개발격자 = 경계 교차 전부, 균등 배분 · 비개발 = 총량−개발, 직전 시점 비례 · 이전 개발지구는 다음 연도 거주지화</small></div>
+  <ul><li>충남 보고서 격자 결과 <b>오차 0 재현</b> 검증. 마지막 목표연도 이후 준공 사업은 반영 불가(로그 경고).</li></ul>
+  <div class="specs"><div class="cap">입력 형식 (플러그인 [형식] 버튼과 동일)</div>
+  <details class="spec"><summary>개발사업 지구 경계 <small>폴리곤 · 1행 = 1개발사업</small></summary><div class="bd">
+    <table><tr><th>컬럼</th><th>타입</th><th>필수</th><th>설명</th></tr>
+    <tr><td>plan_pop</td><td>숫자</td><td>필수</td><td class="wrap">계획인구(명) — 0·NULL 행은 제외</td></tr>
+    <tr><td>yr_done</td><td>정수</td><td>필수</td><td class="wrap">준공연도 (예: 2028)</td></tr>
+    <tr><td>prj_pop</td><td>숫자</td><td>선택</td><td class="wrap">사업 전체 계획인구 합 — 복수 시군 분할 사업의 입주율 구간 판정용</td></tr>
+    <tr><td>sgg_cd_h</td><td>정수</td><td>선택</td><td class="wrap">관할 시군구 코드 — 있으면 해당 시군 격자로만, 없으면 교차 시군 1/n</td></tr></table>
+    <table class="sample"><tr><td>plan_pop</td><td>yr_done</td><td>prj_pop</td><td>sgg_cd_h</td></tr>
+    <tr><td>12500</td><td>2027</td><td>12500</td><td>34010</td></tr>
+    <tr><td>48000</td><td>2030</td><td>96000</td><td>34020</td></tr></table>
+    <ul class="note"><li>격자와 공간 교차로 개발격자 판정 (CRS 자동 변환)</li>
+    <li>필드명이 달라도 필드 콤보에서 선택 가능</li></ul>
+  </div></details>
+  </div>
+  </div>
+  <figure><img src="docs_img/a_계획인구_거주.png" alt="계획인구 반영 배분 화면"><figcaption>③ 계획인구 반영 — 지구 필드만 지정하면 됨</figcaption></figure>
+  </div>
+</div></section>
+
+<!-- ═══ PART 2 근무인구 배분 ═══ -->
+<div class="band"><div class="wrap"><span class="no">PART 2</span><h3>근무인구 배분</h3><span class="sub">추계 1회 → 이후 BAU·계획인구 반영은 거주와 동일</span></div></div>
+
+<!-- 2-1 근무 추계 -->
+<section class="sec" id="sec-work"><div class="wrap">
+  <span class="eyebrow">근무인구 배분</span>
+  <h2>근무인구 추계 — 배분 전 필수 1회</h2>
+  <div class="ipo">
+    <div class="b in"><h5>INPUT</h5>고용률 시계열 + 15세 이상 장래인구 + 격자 기준연도 근무인구(앵커, 자동)</div><div class="ar">→</div>
+    <div class="b alg"><h5>알고리즘</h5>고용률 CAGR → 장래 취업자 → 구간별 증감률을 앵커에 연쇄 (충남 방법론, KOTI 일치 검증)</div><div class="ar">→</div>
+    <div class="b out"><h5>OUTPUT</h5>근무인구 추계 테이블 — 공통 데이터로 <b>자동 연결</b> → 이후 BAU·계획인구 반영은 거주와 동일</div>
+  </div>
+  <div class="duo">
+  <div class="txt">
+  <ul class="keys">
+    <li><span class="bdg">1</span><b>고용률 시계열</b> — 지역·연도·고용률 3열 (지역당 <b>2개 연도 이상</b>). 지역 이름은 격자 <code>sgg_nm</code>과 일치</li>
+    <li><span class="bdg">2</span><b>15세 이상 장래인구</b> — 지역 × 연도 컬럼. 이 연도들이 추계 목표연도가 됨</li>
+    <li><span class="bdg">3</span><b>앵커 기준연도</b> — 격자 pop_w의 시점 (기본값 2023)</li>
+    <li><span class="bdg">4</span><b>추계 CSV 저장 파일</b> · <span class="bdg in">5</span><b>실행</b> — 완료 시 자동 연결 + ① BAU로 이동</li>
+  </ul>
+  <div class="formula">취업자(y) = 고용률(y) × 15세 이상 인구(y) → 근무인구(t₁) = 근무인구(직전) × (1+g)^년수</div>
+  <ul>
+    <li>공통 데이터에서 <b>격자를 먼저 선택</b>해야 실행 가능 (앵커 산출용).</li>
+    <li>계획인구 반영 시 개발지구 근무 유입 = 계획인구 × 시군 원단위(Σpop_w/Σpop_r).</li>
+  </ul>
+  <div class="specs"><div class="cap">입력 형식 (플러그인 [형식] 버튼과 동일)</div>
+  <details class="spec"><summary>고용률 시계열 <small>csv·xlsx · long 형식</small></summary><div class="bd">
+    <table><tr><th>컬럼</th><th>타입</th><th>필수</th><th>설명</th></tr>
+    <tr><td>1열: 지역</td><td>문자</td><td>필수</td><td class="wrap">시군구 이름 — 격자 sgg_nm과 일치해야 함</td></tr>
+    <tr><td>2열: 연도</td><td>정수</td><td>필수</td><td class="wrap">관측 연도 — 지역당 2개 이상</td></tr>
+    <tr><td>3열: 고용률</td><td>숫자</td><td>필수</td><td class="wrap">고용률(%)</td></tr></table>
+    <table class="sample"><tr><td>지역</td><td>연도</td><td>고용률(%)</td></tr>
+    <tr><td>천안시</td><td>2017</td><td>62.3</td></tr><tr><td>천안시</td><td>2022</td><td>64.1</td></tr></table>
+    <ul class="note"><li>컬럼 이름 무관 — 첫 3개 컬럼을 지역·연도·값 순으로 해석</li>
+    <li>지역별 최초~최후 연도로 연평균 증감률(CAGR) 산출</li>
+    <li>'합계' 포함 행은 자동 제외</li></ul>
+  </div></details>
+  <details class="spec"><summary>15세 이상 장래인구 <small>csv·xlsx · wide 형식</small></summary><div class="bd">
+    <table><tr><th>컬럼</th><th>타입</th><th>필수</th><th>설명</th></tr>
+    <tr><td>1열: 지역</td><td>문자</td><td>필수</td><td class="wrap">시군구 이름 — 격자 sgg_nm과 일치</td></tr>
+    <tr><td>연도 컬럼</td><td>숫자</td><td>필수</td><td class="wrap">연도별 15세 이상 인구 — 2개 이상. 이 연도들이 추계 구간·목표연도가 됨</td></tr></table>
+    <table class="sample"><tr><td>지역</td><td>2022</td><td>2025</td><td>2030</td><td>2035</td><td>2040</td></tr>
+    <tr><td>천안시</td><td>590000</td><td>601000</td><td>615000</td><td>622000</td><td>624000</td></tr>
+    <tr><td>공주시</td><td>92000</td><td>90000</td><td>87000</td><td>84000</td><td>81000</td></tr></table>
+    <ul class="note"><li>연도 컬럼명은 2030·2030년·pop_2030 모두 인식</li>
+    <li>취업자 수 = 장래 고용률 × 이 인구</li></ul>
+  </div></details>
+  </div>
+  </div>
+  <figure><img src="docs_img/a_근무추계.png" alt="근무인구 추계 화면"><figcaption>근무인구 추계 — 입력 2개 + 기준연도</figcaption></figure>
+  </div>
+</div></section>
+
+<!-- ═══ PART 3 장래 중심지 분석 ═══ -->
+<div class="band"><div class="wrap"><span class="no">PART 3</span><h3>장래 중심지 분석</h3><span class="sub">배분 결과 → 연도별 중심지 폴리곤·위계</span></div></div>
+
+<!-- 3-1 장래 중심지 식별 -->
+<section class="sec" id="sec-center"><div class="wrap">
+  <span class="eyebrow">장래 중심지 분석</span>
+  <h2>장래 중심지 식별 — 밀도 기반 4단계</h2>
+  <div class="ipo">
+    <div class="b in"><h5>INPUT</h5>거주 배분결과 + 근무 배분결과 (공통 연도 자동 감지)</div><div class="ar">→</div>
+    <div class="b alg"><h5>알고리즘</h5>① 격자 분류 → ② 100m 버퍼 병합 → ③ 1km 이내 소집적지 제거 → ④ UN DEGURBA 위계</div><div class="ar">→</div>
+    <div class="b out"><h5>OUTPUT</h5>연도별 중심지 폴리곤(위계·인구·밀도) + 요약 통계 → 연도별 위계 지도 그룹 + 3D 슬롯</div>
+  </div>
+  <div class="duo">
+  <div class="txt">
+  <ul class="keys">
+    <li><span class="bdg">1</span><b>거주 배분결과</b> · <span class="bdg in">2</span><b>근무 배분결과</b> — 어느 시나리오든 가능, <b>같은 격자(gid)</b>여야 함</li>
+    <li><span class="bdg">3</span><b>기준연도</b> — pop_r/pop_w로 기준연도도 분석 (0 = 제외)</li>
+    <li><span class="bdg">4</span><b>집적지 기준</b> — 1: 주거≥1,500·근무≥900 / 2: 주거≥300·근무≥150 / 3: 주거≥300</li>
+    <li><span class="bdg">5</span><b>위계 기준</b> — 1차: 밀도≥1,500·인구 5만↑ / 2차: 밀도≥300·인구 5천↑ / 3차: 밀도≥300</li>
+    <li><span class="bdg">6</span><b>결과 저장 파일</b> · <span class="bdg in">7</span><b>실행</b></li>
+  </ul>
+  <ul>
+    <li>지도 색: 1차 빨강 · 2차 주황 · 3차 노랑 · 위계외 회색. 연도별 레이어(마지막 연도만 켜짐).</li>
+    <li>검증: 충남 2023 실측 — 보고서와 <b>완전 일치</b> (1차 6 · 2차 26 · 3차 119개).</li>
+  </ul>
+  <div class="specs"><div class="cap">입력 형식 (플러그인 [형식] 버튼과 동일)</div>
+  <details class="spec"><summary>배분결과 격자 <small>PART 1·2 출력 · 폴리곤 gpkg·shp</small></summary><div class="bd">
+    <table><tr><th>컬럼</th><th>타입</th><th>필수</th><th>설명</th></tr>
+    <tr><td>gid</td><td>문자</td><td>필수</td><td class="wrap">격자 고유 ID — 거주·근무 결과 간 매칭 키</td></tr>
+    <tr><td>pop_YYYY</td><td>숫자</td><td>필수</td><td class="wrap">연도별 배분 인구 — 거주·근무 공통 연도만 분석</td></tr>
+    <tr><td>pop_r / pop_w</td><td>숫자</td><td>선택</td><td class="wrap">기준연도 인구 — 기준연도 분석에 사용</td></tr></table>
+    <table class="sample"><tr><td>gid</td><td>pop_r</td><td>pop_2025</td><td>pop_2030</td><td>pop_2035</td><td>pop_2040</td></tr>
+    <tr><td>다바4321</td><td>1532.4</td><td>1601.2</td><td>1688.0</td><td>1702.3</td><td>1710.9</td></tr>
+    <tr><td>다바4322</td><td>87.0</td><td>85.1</td><td>82.6</td><td>80.0</td><td>77.7</td></tr></table>
+    <ul class="note"><li>배분 결과 파일을 그대로 사용 (어느 시나리오든 가능)</li>
+    <li>거주·근무 결과는 같은 격자(gid 집합)여야 함</li></ul>
+  </div></details>
+  </div>
+  <div class="tip"><b>주의</b> 장래연도까지 보려면 근무인구 배분을 먼저. CRS는 미터 단위(<b>EPSG:5179</b>).</div>
+  </div>
+  <figure><img src="docs_img/a_중심지식별.png" alt="장래 중심지 식별 화면"><figcaption>장래 중심지 식별 — 임계값 전부 수정 가능 (기본값 = 충남 방법론)</figcaption></figure>
+  </div>
+</div></section>
+
+<!-- ═══ PART 4 생활권 분석 ═══ -->
+<div class="band"><div class="wrap"><span class="no">PART 4</span><h3>생활권 분석</h3><span class="sub">공통 데이터 → 위계 · 중심점 · 기초생활권 · 상위생활권</span></div></div>
+
+<!-- 4-0 생활권 공통 -->
+<section class="sec" id="sec-lz-common"><div class="wrap">
+  <span class="eyebrow">생활권 분석 · 공통 데이터</span>
+  <h2>원천 파일 7종 — 세 프로세스가 여기서 가져다 쓴다</h2>
+  <div class="ipo">
+    <div class="b in"><h5>INPUT</h5>원천 7종 (격자·읍면동·인프라·OD·중심점·도로망·통행)</div><div class="ar">→</div>
+    <div class="b alg"><h5>처리</h5>파일 선택 시 필드 목록 자동 인식 — 각 프로세스 페이지의 필드 콤보에 공급</div><div class="ar">→</div>
+    <div class="b out"><h5>연결</h5><span class="bdg in">5</span>는 ② 실행 시 자동 연결. ①·③ 결과(위계·기초생활권)는 ④ 상위생활권 페이지에 <b>자동 연결</b></div>
+  </div>
+  <div class="duo">
+  <div class="txt">
+  <ul class="keys">
+    <li><span class="bdg">1</span><b>거점지도 격자</b> — ①②③ 전부 사용</li>
+    <li><span class="bdg">2</span><b>읍면동 경계</b>(선택) — 이름 부여·중복 제거 (①)</li>
+    <li><span class="bdg">3</span><b>생활인프라충족도</b> — 시설 충족 여부 (①)</li>
+    <li><span class="bdg">4</span><b>격자→중심지 OD</b> — ③ 할당용, <b>완성본 CSV</b> (⑤ 중심점과 짝)</li>
+    <li><span class="bdg">5</span><b>중심지 중심점</b> — OD와 같은 짝 ← ② 자동 연결</li>
+    <li><span class="bdg">6</span><b>도로망</b> — 거리행렬용 (④ QNEAT3)</li>
+    <li><span class="bdg">7</span><b>통행 행렬</b> — 매력도용 (④)</li>
+  </ul>
+  <div class="tip"><b>데이터</b> 전남·광주 실습: <code>data\생활권분석\</code> — 폴더 번호 01~08이 슬롯 번호와 일치 (⑨는 ③ 실행으로 생성). 형식은 아래 표 참고.</div>
+  </div>
+  <figure><img src="docs_img/a_생활권공통.png" alt="생활권 분석 공통 데이터 화면"><figcaption>생활권 분석 · 공통 데이터 — 원천 슬롯 7개 (그림은 구버전 — ⑧⑨는 ③ 페이지로 이동됨)</figcaption></figure>
+  </div>
+  <div class="specs cols"><div class="cap" style="grid-column:1/-1">슬롯별 입력 형식 (플러그인 [형식] 버튼과 동일)</div>
+  <details class="spec"><summary><span class="bdg in">1</span>국토공간거점지도 격자 <small>1km 폴리곤 shp·gpkg</small></summary><div class="bd">
+    <table><tr><th>컬럼</th><th>타입</th><th>필수</th><th>설명</th></tr>
+    <tr><td>gid</td><td>문자</td><td>필수</td><td class="wrap">격자 고유 ID — OD·중심점과 매칭 키</td></tr>
+    <tr><td>type</td><td>문자</td><td>필수</td><td class="wrap">거점 유형 — 후보그룹1 판정 (값: '중심지Ⅰ'·'중심지Ⅱ')</td></tr>
+    <tr><td>pop_r</td><td>숫자</td><td>필수</td><td class="wrap">거주인구(밀도) — 후보그룹2 판정·속성 집계·대표점 가중치</td></tr>
+    <tr><td>pop_w</td><td>숫자</td><td>권장</td><td class="wrap">근무인구 — 속성 집계(wpop_*)</td></tr>
+    <tr><td>pc_in / pc_out</td><td>숫자</td><td>선택</td><td class="wrap">유입·유출 중심성 — 속성 집계</td></tr></table>
+    <table class="sample"><tr><td>gid</td><td>type</td><td>pop_r</td><td>pop_w</td><td>pc_in</td><td>pc_out</td></tr>
+    <tr><td>다바4321</td><td>중심지Ⅱ</td><td>1532.4</td><td>2210.0</td><td>0.82</td><td>0.44</td></tr></table>
+    <ul class="note"><li>필드명이 달라도 각 프로세스 페이지의 필드 콤보에서 선택 가능</li></ul>
+  </div></details>
+  <details class="spec"><summary><span class="bdg in">2</span>읍면동 경계 <small>폴리곤 shp·gpkg · 선택</small></summary><div class="bd">
+    <table><tr><th>컬럼</th><th>타입</th><th>필수</th><th>설명</th></tr>
+    <tr><td>emd_nm</td><td>문자</td><td>필수</td><td class="wrap">읍면동 명칭 — 후보 폴리곤 이름 부여·중복 제거</td></tr></table>
+    <table class="sample"><tr><td>emd_nm</td></tr><tr><td>천안시 동남구 신부동</td></tr></table>
+    <ul class="note"><li>통계청 읍면동 경계(bnd_dong) 사용 시 명칭 필드는 ADM_NM — 필드 콤보에서 선택</li></ul>
+  </div></details>
+  <details class="spec"><summary><span class="bdg in">3</span>생활인프라충족도 <small>500m 격자 폴리곤 shp·gpkg</small></summary><div class="bd">
+    <table><tr><th>컬럼</th><th>타입</th><th>필수</th><th>설명</th></tr>
+    <tr><td>*_ox 열들</td><td>숫자</td><td>필수</td><td class="wrap">시설별 충족 여부(0/1) — 마을시설·거점시설 열을 ① 페이지에서 복수 선택</td></tr></table>
+    <table class="sample"><tr><td>GRID_CD</td><td>kinder_ox</td><td>phar_ox</td><td>hosp_ox</td><td>lib_ox</td></tr>
+    <tr><td>다바43211</td><td>1</td><td>1</td><td>0</td><td>0</td></tr></table>
+    <ul class="note"><li>마을시설 예: 어린이집·약국 / 거점시설 예: 병원·도서관</li>
+    <li>tfac_avg(전체시설 평균) ≥ 4.0 → 생활중심지 · bfac_avg(거점시설 평균) ≥ 5.0 → 지역중심지 기본 규칙에 사용</li></ul>
+  </div></details>
+  <details class="spec"><summary><span class="bdg in">4</span>격자→중심지 OD 행렬 <small>CSV · 완성본 입력</small></summary><div class="bd">
+    <table><tr><th>컬럼</th><th>타입</th><th>필수</th><th>설명</th></tr>
+    <tr><td>origin_id</td><td>문자</td><td>필수</td><td class="wrap">출발 격자 ID — 격자 gid와 매칭</td></tr>
+    <tr><td>destination_id</td><td>문자</td><td>필수</td><td class="wrap">도착 중심지 격자 ID — 중심점 gid와 매칭</td></tr>
+    <tr><td>total_cost</td><td>숫자</td><td>필수</td><td class="wrap">이동 비용(거리·시간) — 최소값 중심지로 할당</td></tr></table>
+    <table class="sample"><tr><td>origin_id</td><td>destination_id</td><td>total_cost</td></tr>
+    <tr><td>다바4321</td><td>다바5100</td><td>4820.5</td></tr></table>
+    <ul class="note"><li>격자 1개 × 중심지 N개 조합의 롱 형식</li><li>컬럼명이 달라도 ② 페이지 필드 콤보에서 선택</li></ul>
+  </div></details>
+  <details class="spec"><summary><span class="bdg in">5</span>중심지 중심점 <small>포인트 shp·gpkg</small></summary><div class="bd">
+    <table><tr><th>컬럼</th><th>타입</th><th>필수</th><th>설명</th></tr>
+    <tr><td>gid</td><td>문자</td><td>필수</td><td class="wrap">중심지 격자 ID — OD의 destination_id와 매칭</td></tr>
+    <tr><td>cent_id</td><td>문자/정수</td><td>필수</td><td class="wrap">중심지(권역) ID — 기초생활권 구분 키</td></tr>
+    <tr><td>cent_nm</td><td>문자</td><td>필수</td><td class="wrap">중심지 이름 — 지도 심볼 표기</td></tr></table>
+    <table class="sample"><tr><td>gid</td><td>cent_id</td><td>cent_nm</td></tr>
+    <tr><td>다바5100</td><td>C01</td><td>천안역세권</td></tr></table>
+    <ul class="note"><li>OD 행렬을 만들 때 쓴 중심점 파일과 동일해야 함</li></ul>
+  </div></details>
+  <details class="spec"><summary><span class="bdg in">6</span>도로망 <small>라인 shp·gpkg · KTDB GIS 도로망도</small></summary><div class="bd">
+    <table><tr><th>컬럼</th><th>타입</th><th>필수</th><th>설명</th></tr>
+    <tr><td>ONEWAY</td><td>문자</td><td>필수</td><td class="wrap">일방통행 여부 — QNEAT3 경로 탐색에 사용</td></tr></table>
+    <table class="sample"><tr><td>LINK_ID</td><td>ONEWAY</td><td>MAX_SPD</td></tr>
+    <tr><td>1000001</td><td>FT</td><td>80</td></tr></table>
+    <ul class="note"><li>CRS는 EPSG:5179 권장</li><li>③ 거리행렬(QNEAT3) 단계에서만 사용</li></ul>
+  </div></details>
+  <details class="spec"><summary><span class="bdg in">7</span>1km격자 통행 행렬 <small>CSV · KT 모바일 통근 OD</small></summary><div class="bd">
+    <table><tr><th>컬럼</th><th>타입</th><th>필수</th><th>설명</th></tr>
+    <tr><td>o_GRID_1K_CD</td><td>문자</td><td>필수</td><td class="wrap">출발 격자 ID</td></tr>
+    <tr><td>d_GRID_1K_CD</td><td>문자</td><td>필수</td><td class="wrap">도착 격자 ID</td></tr>
+    <tr><td>VOL2</td><td>숫자</td><td>필수</td><td class="wrap">통행량 — 매력도의 유입·유출 통행 집계</td></tr></table>
+    <table class="sample"><tr><td>o_GRID_1K_CD</td><td>d_GRID_1K_CD</td><td>VOL2</td></tr>
+    <tr><td>다바4321</td><td>다바5100</td><td>152.3</td></tr></table>
+    <ul class="note"><li>컬럼명이 달라도 ③ 페이지 필드 콤보에서 선택</li></ul>
+  </div></details>
+  </div>
+</div></section>
+
+<!-- 4-1 위계 분석 -->
+<section class="sec alt" id="sec-tier"><div class="wrap">
+  <span class="eyebrow">생활권 분석 ①</span>
+  <h2>중심지 위계 분석 — 버튼 한 번에 3개 알고리즘</h2>
+  <div class="ipo">
+    <div class="b in"><h5>INPUT</h5>거점지도 격자 + 생활인프라 충족도 + 읍면동 경계(선택)</div><div class="ar">→</div>
+    <div class="b alg"><h5>알고리즘</h5>후보 추출(버퍼 병합) → 속성 추출(격자 집계) → 위계 설정(규칙 평가) — 단계별 버튼, 앞 단계 완료 시 다음 활성화</div><div class="ar">→</div>
+    <div class="b out"><h5>OUTPUT</h5>중심지 위계 폴리곤 + 후보·속성 중간 파일 → 위계색 지도 + 공통 데이터 <span class="bdg in">8</span> 자동 연결</div>
+  </div>
+  <div class="duo">
+  <div class="txt">
+  <ul class="keys">
+    <li><span class="bdg">1</span><b>1단계 실행 — 중심지 후보 추출</b> — 유형 필드('중심지Ⅰ·Ⅱ' = 후보그룹1)·거주인구밀도 임계값(기본값 300, 그룹1 1km 밖) 설정 후 실행</li>
+    <li><span class="bdg">2</span><b>2단계 적용 — 후보 속성 추출</b> — 1단계 완료 시 활성화. 집계 항목을 체크로 선택: 주거·근무인구(합·밀도·격자평균 등), 유입·유출중심성(격자 평균), 생활인프라 평균(전체 20종·마을·거점 — 시설 열 선택, [전체 선택] 버튼)</li>
+    <li><span class="bdg">3</span><b>3단계 실행 — 중심지 및 위계 설정</b> — 2단계 적용 시 활성화. 밀도·주거·근무 임계값 숫자 입력, 또는 <b>[고급 설정…]</b> 한 창에서 전체 유형(광역·지역·생활)의 조건을 집계 속성 행 + AND·OR로 조립(앞에서부터 순차 결합) — 조건 있는 유형은 숫자 기준 대체, 필드 목록은 2단계 결과의 실제 필드만</li>
+  </ul>
+  <div class="formula">생활중심지: 밀도 ≥ 300 · 지역중심지: 밀도 ≥ 300, 주거 ≥ 5천, 근무 ≥ 5천 · 광역중심지: 밀도 ≥ 1,500, 주거 ≥ 5만, 근무 ≥ 5만
+  <small>장래 중심지 식별(UN DEGURBA) 기준 + 근무인구 AND 조건 — 3차·2차·1차 상당. 임계값은 3단계 그룹박스 숫자 입력으로 수정. 미충족 = '이외' · 시설 충족도 통계는 미사용</small></div>
+  <ul><li>지도 색: 광역 빨강 · 지역 주황 · 생활 노랑 · 이외 회색. 후보 폴리곤은 꺼진 레이어로 포함.</li></ul>
+  </div>
+  <figure><img src="docs_img/a_위계분석.png" alt="중심지 위계 분석 화면"><figcaption>① 위계 분석 — 단계별 그룹박스, 파일은 공통 데이터에서</figcaption></figure>
+  </div>
+</div></section>
+
+<!-- 4-2 중심점·OD 산출 -->
+<section class="sec" id="sec-odgen"><div class="wrap">
+  <span class="eyebrow">생활권 분석 ②</span>
+  <h2>중심지 중심점 생성 — 위계와 같은 ID 체계로</h2>
+  <div class="ipo">
+    <div class="b in"><h5>INPUT</h5>중심지 위계 결과(←①) + 거점지도 격자</div><div class="ar">→</div>
+    <div class="b alg"><h5>알고리즘</h5>위계 폴리곤에 속한 격자의 중심점 추출 + 소속 중심지 ID·이름 부여</div><div class="ar">→</div>
+    <div class="b out"><h5>OUTPUT</h5>중심지 중심점 → 공통 데이터 <span class="bdg in">5</span> 자동 연결</div>
+  </div>
+  <ul class="keys">
+    <li><span class="bdg">0</span><b>이전 단계 결과 슬롯</b> — 중심지 위계(←① 자동 연결), 기존 파일 직접 지정 가능 (형식은 아래 표)</li>
+    <li><span class="bdg">1</span><b>중심지 ID·이름 필드</b> — 기본값 cand_id·cand_nm (① 출력과 일치, 기존 위계 파일을 직접 쓸 때만 변경)</li>
+    <li><span class="bdg">2</span><b>실행</b> — 결과가 ⑤에 자동 연결</li>
+  </ul>
+  <ul>
+    <li><b>①의 위계와 같은 ID 체계</b>로 중심점이 만들어짐 — ③·④의 ID 어긋남 방지.</li>
+    <li>격자→중심지 OD는 이 중심점과 짝이 맞는 <b>완성본을 공통 데이터 ④에 입력</b>. 재생성이 필요하면 Processing 툴박스 "격자→중심지 OD 행렬 산출" (QNEAT3, 장시간).</li>
+  </ul>
+  <div class="specs"><div class="cap">결과 슬롯 형식 (플러그인 [형식] 버튼과 동일)</div>
+  <details class="spec"><summary>중심지 위계 결과 <small>① 출력 폴리곤 · 자동 연결</small></summary><div class="bd">
+    <table><tr><th>컬럼</th><th>타입</th><th>필수</th><th>설명</th></tr>
+    <tr><td>cand_id</td><td>문자/정수</td><td>필수</td><td class="wrap">중심지 고유 ID</td></tr>
+    <tr><td>cent_cls</td><td>문자</td><td>필수</td><td class="wrap">위계 (생활중심지·지역중심지·광역중심지·이외)</td></tr>
+    <tr><td>rpop_sum·rpop_den 등</td><td>숫자</td><td>자동</td><td class="wrap">속성 추출 단계가 만든 통계 필드</td></tr></table>
+    <table class="sample"><tr><td>cand_id</td><td>cent_cls</td><td>rpop_sum</td><td>rpop_den</td></tr>
+    <tr><td>1</td><td>광역중심지</td><td>683200</td><td>1820.5</td></tr></table>
+    <ul class="note"><li>① 실행 시 자동 연결 — 기존 결과 파일 직접 지정도 가능</li></ul>
+  </div></details>
+  </div>
+</div></section>
+
+<!-- 4-3 기초생활권 -->
+<section class="sec alt" id="sec-basic"><div class="wrap">
+  <span class="eyebrow">생활권 분석 ③</span>
+  <h2>기초생활권 도출 — 완성 OD로 할당 + 스무딩</h2>
+  <div class="ipo">
+    <div class="b in"><h5>INPUT</h5>격자→중심지 OD 행렬(←② 또는 완성본) + 거점지도 격자 + 중심지 중심점</div><div class="ar">→</div>
+    <div class="b alg"><h5>알고리즘</h5>격자별 최소 비용 중심지 할당 (자기 권역 비용 0.1) → 이웃 최빈값 반복 스무딩</div><div class="ar">→</div>
+    <div class="b out"><h5>OUTPUT</h5>스무딩된 기초생활권 격자 자료 → 생활권별 배색 지도(전후 비교) + 공통 데이터 <span class="bdg in">9</span> 자동 연결</div>
+  </div>
+  <div class="duo">
+  <div class="txt">
+  <ul class="keys">
+    <li><span class="bdg">1</span><b>OD 필드</b> — 출발 격자 ID·도착 중심지 ID·비용 (기본값 origin_id·destination_id·total_cost)</li>
+    <li><span class="bdg">2</span><b>격자 ID 필드</b> — OD의 출발 ID와 매칭 (기본값 gid)</li>
+    <li><span class="bdg">3</span><b>중심점 필드</b> — 격자 ID(도착 ID 매칭)·중심지 ID·이름</li>
+    <li><span class="bdg">4</span><b>스무딩 설정</b> — 반복 횟수(기본값 8, 클수록 매끈)·랜덤 시드(고정 = 재현)</li>
+    <li><span class="bdg">5</span><b>실행</b></li>
+  </ul>
+  <ul>
+    <li>지도 그룹: 스무딩(켜짐) + 할당 원본(꺼짐, 같은 배색) — 전후 비교.</li>
+  </ul>
+  <div class="tip"><b>주의</b> OD의 ID 체계가 격자·중심점과 같은지 먼저 확인 — <b>다르면 전부 미할당</b>. [형식] 버튼에 매칭 관계 명시.</div>
+  </div>
+  <figure><img src="docs_img/a_기초생활권.png" alt="기초생활권 도출 화면"><figcaption>③ 기초생활권 — 필드 매칭 + 스무딩 설정만</figcaption></figure>
+  </div>
+</div></section>
+
+<!-- 4-4 상위생활권 -->
+<section class="sec" id="sec-upper"><div class="wrap">
+  <span class="eyebrow">생활권 분석 ④</span>
+  <h2>상위생활권 도출 — 대표점 → 거리행렬 → 매력도</h2>
+  <div class="ipo">
+    <div class="b in"><h5>INPUT</h5>중심지 위계(←①) + 기초생활권(←③) + 도로망 + 통행 행렬</div><div class="ar">→</div>
+    <div class="b alg"><h5>알고리즘</h5>인구가중 대표점 → QNEAT3 최단거리 → 매력도 = (유입+유출통행) ÷ 거리(km)² 최대 배정</div><div class="ar">→</div>
+    <div class="b out"><h5>OUTPUT</h5>상위생활권 경계 + 할당 격자 + 매력도 점수·이동량 내역 → 상위생활권별 배색 지도</div>
+  </div>
+  <div class="duo">
+  <div class="txt">
+  <ul class="keys">
+    <li><span class="bdg">0</span><b>이전 단계 결과 슬롯</b> — 기초생활권(←③ 자동 연결), 기존 파일 직접 지정 가능 (중심지 위계 슬롯은 ② 페이지)</li>
+    <li><span class="bdg">1</span><b>기점·종점 유형</b> — 거리행렬 대상 (기본값: 전 유형 → 지역·광역중심지). 콤마 구분 수정</li>
+    <li><span class="bdg">2</span><b>상위중심지 유형</b> — 매력도 배정 대상 (기본값: 지역·광역중심지)</li>
+    <li><span class="bdg">3</span><b>통행 CSV 필드</b> — 출발·도착 격자 ID와 통행량 (기본값 KT: o/d_GRID_1K_CD·VOL2)</li>
+    <li><span class="bdg">4</span><b>실행</b> — QNEAT3 미설치면 실행 전 한글 안내로 차단</li>
+  </ul>
+  <div class="formula">매력도 = (유입통행 + 유출통행) ÷ 거리(km)²
+  <small>자기 자신이 상위중심지면 자기에게 배정 · 거리 0/미존재 쌍 제외(경고) · 배정 근거는 매력도 점수 CSV로 추적</small></div>
+  <ul><li>①~③을 순서대로 실행했다면 위계·기초생활권 슬롯은 이미 자동 연결 — 확인만 하고 실행.</li></ul>
+  <div class="specs"><div class="cap">결과 슬롯 형식 (플러그인 [형식] 버튼과 동일)</div>
+  <details class="spec"><summary>기초생활권 결과 <small>③ 출력 격자 폴리곤 · 자동 연결</small></summary><div class="bd">
+    <table><tr><th>컬럼</th><th>타입</th><th>필수</th><th>설명</th></tr>
+    <tr><td>gid</td><td>문자</td><td>필수</td><td class="wrap">격자 ID</td></tr>
+    <tr><td>cent_id</td><td>문자/정수</td><td>필수</td><td class="wrap">소속 생활권(중심지) ID</td></tr>
+    <tr><td>cent_nm</td><td>문자</td><td>필수</td><td class="wrap">소속 생활권 이름</td></tr></table>
+    <table class="sample"><tr><td>gid</td><td>cent_id</td><td>cent_nm</td></tr>
+    <tr><td>다바4321</td><td>C01</td><td>천안역세권</td></tr></table>
+    <ul class="note"><li>③ 실행 시 자동 연결 — 기존 결과 파일 직접 지정도 가능</li></ul>
+  </div></details>
+  </div>
+  </div>
+  <figure><img src="docs_img/a_상위생활권.png" alt="상위생활권 도출 화면"><figcaption>③ 상위생활권 — 유형 기본값 채워져 있음</figcaption></figure>
+  </div>
+</div></section>
+
+<!-- ═══ PART 5 시각화 ═══ -->
+<div class="band"><div class="wrap"><span class="no">PART 5</span><h3>시각화</h3><span class="sub">배분·중심지 결과를 deck.gl 3D로</span></div></div>
+
+<!-- 5-1 3D -->
+<section class="sec" id="sec-3d"><div class="wrap">
+  <span class="eyebrow">시각화</span>
+  <h2>3D 시각화 — deck.gl HTML 한 파일</h2>
+  <div class="ipo">
+    <div class="b in"><h5>INPUT</h5>배분 결과 슬롯 5개 + 장래 중심지 식별 결과 — 각 단계 실행 시 자동 연결, 빈 슬롯은 건너뜀</div><div class="ar">→</div>
+    <div class="b alg"><h5>처리</h5>격자 = 기둥(높이 √인구, 100명 미만 미표시) · 중심지 = 위계색 폴리곤 압출</div><div class="ar">→</div>
+    <div class="b out"><h5>OUTPUT</h5>3D 시각화 HTML 한 파일 — 서버 없이 브라우저에서 바로 열림</div>
+  </div>
+  <div class="duo">
+  <div class="txt">
+  <ul class="keys">
+    <li><span class="bdg">1</span><b>배분 결과 슬롯</b> — 거주 ①②③ · 근무 ①② (자동 연결, 직접 지정 가능)</li>
+    <li><span class="bdg">2</span><b>장래 중심지 식별 슬롯</b> — 위계색 3D 폴리곤으로 표시</li>
+    <li><span class="bdg">3</span><b>HTML 저장 파일</b> — 비우면 <code>분석결과\인구배분_3D.html</code></li>
+    <li><span class="bdg">4</span><b>생성 후 브라우저 열기</b></li>
+  </ul>
+  <table>
+    <tr><th>조작</th><th>방법</th></tr>
+    <tr><td>연도 전환</td><td class="wrap">연도 점 클릭 — 바닥에서 올라오는 애니메이션</td></tr>
+    <tr><td>회전</td><td class="wrap"><b>휠 버튼 드래그</b>(좌우 방향·상하 기울기) 또는 우클릭 드래그</td></tr>
+    <tr><td>비교</td><td class="wrap">좌우 비교 모드 — 시점 동기화, 시나리오·연도 각각 (BAU 2025 vs 계획인구 2040)</td></tr>
+  </table>
+  </div>
+  <figure><img src="docs_img/a_3D시각화.png" alt="3D 시각화 설정 화면"><figcaption>3D 시각화 설정 화면 — 번호는 왼쪽 설명과 대응. 생성된 HTML은 브라우저에서 연도·회전·비교 탐색</figcaption></figure>
+  </div>
+</div></section>
+
+<!-- ═══ PART 6 데이터 탐색 ═══ -->
+<div class="band"><div class="wrap"><span class="no">PART 6</span><h3>데이터 탐색</h3><span class="sub">격자 데이터 기초통계를 탐색적으로</span></div></div>
+
+<!-- 6-1 격자 통계 탐색 -->
+<section class="sec" id="sec-explore"><div class="wrap">
+  <span class="eyebrow">데이터 탐색</span>
+  <h2>격자 통계 탐색 — 필드별 기초통계 한 표로</h2>
+  <div class="ipo">
+    <div class="b in"><h5>INPUT</h5>격자·테이블 파일 아무거나 (원천 격자, 배분 결과, 위계 결과 등)</div><div class="ar">→</div>
+    <div class="b alg"><h5>처리</h5>선택한 숫자 필드를 한 번에 집계 — 전 피처 단일 패스</div><div class="ar">→</div>
+    <div class="b out"><h5>OUTPUT</h5>필드별 통계 표 (화면 표시 — 파일 저장 없음)</div>
+  </div>
+  <ul class="keys">
+    <li><span class="bdg">1</span><b>파일 선택</b> — 숫자 필드 목록 자동 인식</li>
+    <li><span class="bdg">2</span><b>통계 필드</b> — 복수 선택 (숫자 필드 전체 선택 버튼)</li>
+    <li><span class="bdg">3</span><b>통계 계산</b> — 표에 필드별 결과</li>
+  </ul>
+  <table>
+    <tr><th>통계</th><th>설명</th></tr>
+    <tr><td>유효 N · NULL · 0 개수</td><td class="wrap">값 있는 피처 수, 결측 수, 0인 피처 수</td></tr>
+    <tr><td>합계 · 평균 · 표준편차</td><td class="wrap">전체 유효값 기준</td></tr>
+    <tr><td>0 제외 평균</td><td class="wrap">0인 격자를 뺀 평균 — 인구 0 격자가 많은 데이터에서 실질 평균 확인</td></tr>
+    <tr><td>최소 · Q1 · 중앙값 · Q3 · 최대</td><td class="wrap">사분위(선형보간) 분포 요약</td></tr>
+    <tr><td>왜도 · 첨도</td><td class="wrap">분포 비대칭도·뾰족함 (첨도는 정규분포 = 0 기준)</td></tr>
+    <tr><td>분포 그래프</td><td class="wrap">표에서 필드 행 선택 후 버튼 — 히스토그램 + 같은 평균·표준편차의 정규분포 곡선 팝업, 0 제외 옵션</td></tr>
+  </table>
+</div></section>
+
+<a class="top" href="#top">↑ 맨 위로</a>
+<script>
+// 인쇄 시 형식표 전부 펼치고, 끝나면 원래 상태로 복원
+const specs=document.querySelectorAll('details.spec');
+window.addEventListener('beforeprint',()=>specs.forEach(d=>{d.dataset.was=d.open?'1':'';d.open=true}));
+window.addEventListener('afterprint',()=>specs.forEach(d=>{d.open=d.dataset.was==='1'}));
+</script>
+</body>
+</html>
