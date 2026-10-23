@@ -1,0 +1,117 @@
+{
+  "schema": 1,
+  "name": "순천시",
+  "unit": "시군구",
+  "sgg_codes": [
+    "36030"
+  ],
+  "base_year": 2023,
+  "crs": "EPSG:5179",
+  "city_type": "강소도시",
+  "trend_type": "성숙·안정형",
+  "sgg_city_type": {
+    "36030": "강소도시"
+  },
+  "sgg_trend_type": {
+    "36030": "성숙·안정형"
+  },
+  "data": {
+    "boundary": {
+      "path": "00_경계/행정경계.gpkg",
+      "region_layer": "계획권역",
+      "sgg_layer": "시군구",
+      "sgg_code": "SIGUNGU_CD",
+      "sgg_name": "SIGUNGU_NM",
+      "emd_layer": "읍면동",
+      "emd_code": "ADM_CD",
+      "emd_name": "ADM_NM"
+    },
+    "grid": {
+      "path": "01_격자/거점지도격자_2023.gpkg",
+      "layer": "grid",
+      "fields": {
+        "gid": "gid",
+        "sgg": "sgg_cd",
+        "sgg_h": "sgg_cd_h",
+        "pop_r": "pop_r",
+        "pop_w": "pop_w",
+        "pc_in": "pc_in",
+        "pc_out": "pc_out",
+        "type": "type"
+      }
+    },
+    "infra_500m": {
+      "path": "02_생활인프라/생활인프라충족도_500m.gpkg",
+      "layer": "infra500"
+    },
+    "infra_1km": {
+      "path": "02_생활인프라/생활인프라충족도_1km.gpkg"
+    },
+    "resid_proj": {
+      "path": "03_인구추계/거주인구_추계_시군구.csv",
+      "key": "sgg_cd_h",
+      "note": "기본 거주인구_추계_시군구.csv = 통계청 시군구 추계(BAU·거점유도용, _통계청.csv와 동일)"
+    },
+    "pop15_proj": {
+      "path": "03_인구추계/15세이상_장래인구.csv",
+      "key": "지역"
+    },
+    "emp_rate": {
+      "path": "03_인구추계/고용률_시계열.xlsx"
+    },
+    "work_obs": {
+      "path": "03_인구추계/실측근무인구.xlsx"
+    },
+    "dev_projects": {
+      "path": "04_개발사업/개발사업.gpkg",
+      "fields": {
+        "plan_pop": "plan_pop",
+        "yr_done": "yr_done",
+        "prj_pop": "prj_pop",
+        "sgg": "sgg_cd_h",
+        "plan_emp": "PLAN_EMP"
+      },
+      "layer": "zone"
+    },
+    "fac_neigh_dir": "05_시설/근린시설",
+    "fac_hub_dir": "05_시설/거점시설",
+    "carbon": {
+      "path": "06_탄소/탄소총배출_격자_2023.csv",
+      "join": "grid_cd",
+      "value": "exhst_vl"
+    },
+    "resid_proj_plan": {
+      "path": "03_인구추계/거주인구_추계_시군구_계획인구.csv",
+      "key": "sgg_cd_h",
+      "note": "개발계획 반영 시나리오용: 「2040년 순천도시기본계획」 단계별 계획인구(플러그인 미지원, 수동 별도 실행용)"
+    }
+  },
+  "user_inputs": {
+    "network": {
+      "path": "../전남광주통합특별시/07_사용자자료/도로망_KTDB_2023.gpkg",
+      "oneway": "ONEWAY",
+      "note": "KTDB 도로망 — 전남광주통합특별시 데이터팩의 파일을 그대로 사용(시 경계에서 끊지 않음). 두 지역 폴더가 같은 지역\\ 아래 있어야 함"
+    },
+    "trip": {
+      "path": "07_사용자자료/통행행렬_1km_통근.csv",
+      "fields": {
+        "from": "o_GRID_1K_CD",
+        "to": "d_GRID_1K_CD",
+        "trip": "VOL2"
+      },
+      "note": "1km 격자 간 통근 통행량, 출발·도착 모두 순천시 격자인 행 (통신사 자료 — 외부 배포 시 07_사용자자료 폴더 제외)"
+    }
+  },
+  "sources": {
+    "grid": "국토교통부 국토공간거점지도 2023 (1km)",
+    "sgg": "통계청 SGIS 행정구역경계 2025년 2분기",
+    "emd": "통계청 SGIS 행정구역경계 2023년 4분기 (기준연도)",
+    "infra": "국토생활인프라 20종 충족여부 500m (2022)",
+    "carbon": "탄소공간지도 탄소총괄 배출량 1km (2023)",
+    "city_type": "가이드라인(안) 부표1·부표2 — 순천시 강소도시, 성숙·안정형",
+    "network": "KTDB 도로망 2023 (정제본 fixed_v3)",
+    "trip": "KT 통근 OD (1km 격자)",
+    "resid_proj": "거주인구_추계_시군구.csv = 통계청 시군구 추계. _계획인구.csv = 「2040년 순천도시기본계획」 단계별 계획인구(2025 286,000·2030 292,000·2035 297,000·2040 300,000명)"
+  },
+  "created": "2026-10-23 (전남광주통합특별시 데이터팩에서 순천시만 추출, 도로망은 전남광주 파일 참조)"
+}
