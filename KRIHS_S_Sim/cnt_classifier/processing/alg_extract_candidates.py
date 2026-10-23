@@ -90,6 +90,8 @@ class ExtractCandidatesAlgorithm(QgsProcessingAlgorithm):
     EMD_LAYER       = "EMD_LAYER"
     EMD_NAME_FIELD  = "EMD_NAME_FIELD"
     DEDUP_BY_EMD    = "DEDUP_BY_EMD"
+    MIN_DIST_APPLY  = "MIN_DIST_APPLY"
+    MIN_DIST        = "MIN_DIST"
     OUTPUT_GROUP1   = "OUTPUT_GROUP1"
     OUTPUT_GROUP2   = "OUTPUT_GROUP2"
     OUTPUT          = "OUTPUT"
@@ -121,6 +123,10 @@ class ExtractCandidatesAlgorithm(QgsProcessingAlgorithm):
             "  ② 음의 버퍼 (동일 스타일)\n"
             "  ③ 다중파트 → 단일파트 분리\n"
             "  ④ 점 접촉 폴리곤 병합 (옵션)\n\n"
+            "후처리 (선택, 두 그룹 통합):\n"
+            "  · 읍면동별 중복 제거 — 읍면동마다 거주인구 합계 최대 후보 1개만 유지\n"
+            "  · 중심지 간 최소 거리 — 거주인구 합계가 큰 후보부터 남기고, 이미 남긴 후보와의 "
+            "폴리곤 경계 간 직선거리가 기준(기본 1,500m) 미만인 후보는 상위 중심지의 영향권으로 보고 제거\n\n"
             "출력: 후보그룹1·후보그룹2·통합 레이어 3종\n\n"
             "중심지 후보 이름(cand_nm) = 후보 안 주거인구가 가장 많은 읍면동. "
             "필요하면 속성 테이블에서 직접 수정하세요.\n\n"
@@ -196,6 +202,17 @@ class ExtractCandidatesAlgorithm(QgsProcessingAlgorithm):
             "읍면동별 중복 제거 (읍면동 내 거주인구 합계 최대 폴리곤 1개만 유지)",
             defaultValue=True,
         ))
+        self.addParameter(QgsProcessingParameterBoolean(
+            self.MIN_DIST_APPLY,
+            "중심지 간 최소 거리 적용 (기준 거리 안의 인접 후보 중 거주인구 합계 최대 1개만 유지)",
+            defaultValue=True,
+        ))
+        self.addParameter(QgsProcessingParameterNumber(
+            self.MIN_DIST, "  ↳ 중심지 간 최소 거리 m — 폴리곤 경계 간 직선거리",
+            type=QgsProcessingParameterNumber.Integer,
+            defaultValue=1500,
+            minValue=0,
+        ))
 
         # ── 출력 ──────────────────────────────────────────────────────
         if _sep: self.addParameter(_sep("SEP_OUTPUT", "출력"))
@@ -232,6 +249,8 @@ class ExtractCandidatesAlgorithm(QgsProcessingAlgorithm):
         emd_layer      = self.parameterAsVectorLayer(parameters, self.EMD_LAYER, context)
         emd_name_field = self.parameterAsString(parameters, self.EMD_NAME_FIELD, context)
         dedup_by_emd   = self.parameterAsBoolean(parameters, self.DEDUP_BY_EMD, context)
+        min_dist_apply = self.parameterAsBoolean(parameters, self.MIN_DIST_APPLY, context)
+        min_dist       = self.parameterAsDouble(parameters, self.MIN_DIST, context)
 
         # ── 검증 ──────────────────────────────────────────────────────
         if dedup_by_emd and emd_layer is None:
@@ -261,6 +280,8 @@ class ExtractCandidatesAlgorithm(QgsProcessingAlgorithm):
         feedback.pushInfo(_item("점접촉 병합", "사용" if merge_touching else "미사용"))
         feedback.pushInfo(_item("읍면동 레이어", emd_layer.name() if emd_layer else "미설정"))
         feedback.pushInfo(_item("읍면동별 중복 제거", "사용" if dedup_by_emd else "미사용"))
+        feedback.pushInfo(_item("중심지 간 최소 거리",
+                                f"사용 ({min_dist:,.0f} m)" if min_dist_apply and min_dist > 0 else "미사용"))
 
         # ── 출력 싱크 생성 ────────────────────────────────────────────
         group_fields = self._make_group_fields()
@@ -321,14 +342,15 @@ class ExtractCandidatesAlgorithm(QgsProcessingAlgorithm):
             return {}
         feedback.pushInfo(_item("최종 후보그룹2 폴리곤", f"{_fmt_n(len(g2_polys))}개"))
 
-        # ── [5단계] 속성 할당 및 중복 제거 (진행률 67~90%) ──────────
-        feedback.pushInfo(_section("[5단계] 속성 할당 및 읍면동 중복 제거"))
+        # ── [5단계] 속성 할당·중복 제거·최소 거리 (진행률 67~90%) ────
+        feedback.pushInfo(_section("[5단계] 속성 할당, 읍면동 중복 제거, 중심지 간 최소 거리"))
         feedback.setProgress(67)
         records = self._assign_attributes(
             g1_polys, g2_polys,
             geojeom_layer, pop_field,
             emd_layer, emd_name_field,
             dedup_by_emd, feedback,
+            min_dist if min_dist_apply else 0.0,
         )
         if feedback.isCanceled():
             return {}
@@ -628,6 +650,7 @@ class ExtractCandidatesAlgorithm(QgsProcessingAlgorithm):
         emd_name_field: str,
         dedup_by_emd: bool,
         feedback: QgsProcessingFeedback,
+        min_dist: float = 0.0,
     ) -> List[dict]:
         """group·name·id를 부여한 records 리스트 반환."""
 
@@ -667,6 +690,15 @@ class ExtractCandidatesAlgorithm(QgsProcessingAlgorithm):
                 feedback.pushInfo("  중복 제거 건너뜀 (읍면동 레이어 미설정)")
             else:
                 feedback.pushInfo("  중복 제거 옵션 미사용")
+
+        # ── 중심지 간 최소 거리 ───────────────────────────────────────
+        if min_dist > 0:
+            feedback.pushInfo(_subsection(f"중심지 간 최소 거리 ({min_dist:,.0f} m)"))
+            tagged = self._filter_min_distance(
+                tagged, geojeom_index, geojeom_by_fid, pop_field, min_dist, feedback,
+            )
+        else:
+            feedback.pushInfo("  중심지 간 최소 거리 옵션 미사용")
 
         # ── 이름 할당 ─────────────────────────────────────────────────
         feedback.pushInfo(_subsection(f"이름 할당  ({_fmt_n(len(tagged))}개 후보)"))
@@ -805,6 +837,45 @@ class ExtractCandidatesAlgorithm(QgsProcessingAlgorithm):
         feedback.pushInfo(_item("제거 수", f"{_fmt_n(total_removed)}개"))
 
         return [tagged[i] for i in sorted(keep_indices)]
+
+    def _filter_min_distance(
+        self,
+        tagged: List[Tuple[QgsGeometry, str]],
+        geojeom_index: QgsSpatialIndex,
+        geojeom_by_fid: dict,
+        pop_field: str,
+        min_dist: float,
+        feedback: QgsProcessingFeedback,
+    ) -> List[Tuple[QgsGeometry, str]]:
+        """거주인구 합계가 큰 후보부터 남기고, 이미 남긴 후보와 폴리곤 경계 간 직선거리가
+        min_dist 미만인 후보는 제거(상위 중심지의 영향권으로 봄). 남은 후보의 원래 순서는 유지."""
+        pops = [self._sum_pop_in_polygon(g, geojeom_index, geojeom_by_fid, pop_field)
+                for g, _ in tagged]
+        order = sorted(range(len(tagged)), key=lambda i: (-pops[i], i))
+        kept: List[int] = []
+        removed = 0
+        for i in order:
+            geom = tagged[i][0]
+            near = None
+            for k in kept:
+                d = geom.distance(tagged[k][0])
+                if d < min_dist:
+                    near = (k, d)
+                    break
+            if near is None:
+                kept.append(i)
+                continue
+            removed += 1
+            short_grp = "그룹1" if tagged[i][1] == "중심지후보그룹1" else "그룹2"
+            feedback.pushInfo(
+                f"    ✗ 제거  #{i + 1:>3} [{short_grp}]  인구합계: {pops[i]:>12,.1f}"
+                f"  ← #{near[0] + 1} (인구합계 {pops[near[0]]:,.1f})와 {near[1]:,.0f} m"
+            )
+        if not removed:
+            feedback.pushInfo("  기준 거리 안의 인접 후보 없음")
+        feedback.pushInfo(_item("제거 전", f"{_fmt_n(len(tagged))}개"))
+        feedback.pushInfo(_item("제거 후", f"{_fmt_n(len(kept))}개"))
+        return [tagged[i] for i in sorted(kept)]
 
     def _sum_pop_in_polygon(
         self,

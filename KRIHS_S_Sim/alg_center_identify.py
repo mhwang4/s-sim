@@ -8,12 +8,18 @@
   3) 집적지3 폴리곤 중 집적지1/2 폴리곤과 1km 이내인 것 제거
   4) 폴리곤별 주거인구 밀도·수로 위계 구분 (UN DEGURBA):
      1차(밀도≥1500 AND 인구≥50000) / 2차(밀도≥300 AND 인구≥5000) / 3차(밀도≥300)
+  (선택) 3)과 4) 사이에 중심지-생활권 분석 ① 후보 추출과 같은 후처리:
+     · 읍면동별 중복 제거 — 교차 면적 최대 읍면동에 배정, 읍면동마다 주거인구 최대 1개 유지
+     · 중심지 간 최소 거리 — 주거인구 큰 순으로 남기고, 남긴 폴리곤과 경계 간 직선거리가
+       기준(기본 1,500m) 미만이면 제거
 """
 import csv
 import re
+from collections import defaultdict
 
 from PyQt5.QtCore import QVariant
 from qgis.core import (
+    QgsCoordinateTransform,
     QgsFeature,
     QgsFeatureSink,
     QgsField,
@@ -22,11 +28,14 @@ from qgis.core import (
     QgsProcessing,
     QgsProcessingAlgorithm,
     QgsProcessingException,
+    QgsProcessingParameterBoolean,
     QgsProcessingParameterFeatureSink,
     QgsProcessingParameterField,
     QgsProcessingParameterFileDestination,
     QgsProcessingParameterNumber,
     QgsProcessingParameterVectorLayer,
+    QgsProject,
+    QgsSpatialIndex,
 )
 
 BUF = 100.0        # 병합 버퍼 (m)
@@ -58,6 +67,11 @@ class CenterIdentifyAlgorithm(QgsProcessingAlgorithm):
     T2_WPOP = 'T2_WPOP'
     T3_WDENS = 'T3_WDENS'
     T3_WPOP = 'T3_WPOP'
+    # 후처리 (선택) — 중심지-생활권 분석 ① 후보 추출과 같은 규칙
+    EMD_LAYER = 'EMD_LAYER'
+    DEDUP_BY_EMD = 'DEDUP_BY_EMD'
+    MIN_DIST_APPLY = 'MIN_DIST_APPLY'
+    MIN_DIST = 'MIN_DIST'
     OUTPUT = 'OUTPUT'
     OUTPUT_CSV = 'OUTPUT_CSV'
 
@@ -114,6 +128,20 @@ class CenterIdentifyAlgorithm(QgsProcessingAlgorithm):
             self.addParameter(QgsProcessingParameterNumber(
                 key, label, type=QgsProcessingParameterNumber.Double,
                 minValue=0.0, defaultValue=default))
+        self.addParameter(QgsProcessingParameterVectorLayer(
+            self.EMD_LAYER, '읍면동 경계 (읍면동별 중복 제거용, 선택)',
+            types=[QgsProcessing.TypeVectorPolygon], optional=True))
+        self.addParameter(QgsProcessingParameterBoolean(
+            self.DEDUP_BY_EMD,
+            '읍면동별 중복 제거 (읍면동 내 주거인구 최대 중심지 1개만 유지 — 읍면동 경계 필요)',
+            defaultValue=True))
+        self.addParameter(QgsProcessingParameterBoolean(
+            self.MIN_DIST_APPLY,
+            '중심지 간 최소 거리 적용 (기준 거리 안의 인접 중심지 중 주거인구 최대 1개만 유지)',
+            defaultValue=True))
+        self.addParameter(QgsProcessingParameterNumber(
+            self.MIN_DIST, '  ↳ 중심지 간 최소 거리 m — 폴리곤 경계 간 직선거리',
+            type=QgsProcessingParameterNumber.Integer, minValue=0, defaultValue=1500))
         self.addParameter(QgsProcessingParameterFeatureSink(
             self.OUTPUT, '중심지 폴리곤 (연도×위계)'))
         self.addParameter(QgsProcessingParameterFileDestination(
@@ -167,6 +195,41 @@ class CenterIdentifyAlgorithm(QgsProcessingAlgorithm):
                     break
         return stats
 
+    @staticmethod
+    def _dedup_emd(cands, emd_index, emd_geoms, emd_tr):
+        """읍면동별 중복 제거 — 교차 면적 최대 읍면동에 배정, 읍면동마다 주거인구 최대 1개.
+        cands: [(geom, src, n, pop_r, pop_w)] → (남은 cands, 제거 수). 읍면동에 안 걸치면 그대로 둠."""
+        groups = defaultdict(list)
+        keep = []
+        for i, c in enumerate(cands):
+            q = QgsGeometry(c[0])
+            if emd_tr is not None:
+                q.transform(emd_tr)
+            best, best_area = None, -1.0
+            for fid in emd_index.intersects(q.boundingBox()):
+                inter = q.intersection(emd_geoms[fid])
+                if inter and not inter.isNull() and inter.area() > best_area:
+                    best, best_area = fid, inter.area()
+            if best is None:
+                keep.append(i)
+            else:
+                groups[best].append(i)
+        for idx in groups.values():
+            keep.append(max(idx, key=lambda i: (cands[i][3], -i)))
+        keep = sorted(keep)
+        return [cands[i] for i in keep], len(cands) - len(keep)
+
+    @staticmethod
+    def _min_distance(cands, min_dist):
+        """주거인구 큰 순으로 남기고, 남긴 폴리곤과 경계 간 직선거리가 min_dist 미만이면 제거."""
+        order = sorted(range(len(cands)), key=lambda i: (-cands[i][3], i))
+        kept = []
+        for i in order:
+            if all(cands[i][0].distance(cands[k][0]) >= min_dist for k in kept):
+                kept.append(i)
+        kept = sorted(kept)
+        return [cands[i] for i in kept], len(cands) - len(kept)
+
     # ── 본 처리 ──────────────────────────────────────────
 
     def processAlgorithm(self, parameters, context, feedback):
@@ -182,11 +245,29 @@ class CenterIdentifyAlgorithm(QgsProcessingAlgorithm):
                         self.T1_WDENS, self.T1_WPOP, self.T2_WDENS, self.T2_WPOP,
                         self.T3_WDENS, self.T3_WPOP)}
         csv_path = self.parameterAsFileOutput(parameters, self.OUTPUT_CSV, context)
+        emd = self.parameterAsVectorLayer(parameters, self.EMD_LAYER, context)
+        dedup = self.parameterAsBoolean(parameters, self.DEDUP_BY_EMD, context)
+        min_dist = (self.parameterAsDouble(parameters, self.MIN_DIST, context)
+                    if self.parameterAsBoolean(parameters, self.MIN_DIST_APPLY, context) else 0.0)
 
         if res.sourceCrs().isGeographic():
             raise QgsProcessingException(
                 '거주 배분결과 CRS가 지리좌표계입니다 — 미터 단위 투영좌표계'
                 '(EPSG:5179 등)가 필요합니다 (버퍼·거리·면적 연산).')
+
+        # 읍면동 중복 제거 준비 (경계가 없으면 건너뜀)
+        emd_index, emd_geoms, emd_tr = None, {}, None
+        if dedup and emd is None:
+            feedback.pushWarning('읍면동별 중복 제거를 선택했지만 읍면동 경계가 없어 건너뜁니다.')
+        elif dedup:
+            emd_index = QgsSpatialIndex()
+            for ef in emd.getFeatures():
+                emd_geoms[ef.id()] = QgsGeometry(ef.geometry())
+                emd_index.addFeature(ef)
+            if emd.crs() != res.sourceCrs():
+                emd_tr = QgsCoordinateTransform(res.sourceCrs(), emd.crs(), QgsProject.instance())
+        feedback.pushInfo(f'후처리: 읍면동 중복 제거 {"사용" if emd_index is not None else "미사용"} / '
+                          f'중심지 간 최소 거리 {f"사용 ({min_dist:,.0f} m)" if min_dist > 0 else "미사용"}')
 
         # 연도 결정: 두 레이어 공통 pop_YYYY (+ 기준연도 pop_r/pop_w)
         res_years = self._year_fields(res)
@@ -282,39 +363,51 @@ class CenterIdentifyAlgorithm(QgsProcessingAlgorithm):
                               f'집적지3 {len(kept3)}개 '
                               f'(1km 이내 제거 {len(parts3) - len(kept3)}개)')
 
-            # 4단계: 요약통계 → 위계 구분
-            n_out = {'1차': 0, '2차': 0, '3차': 0, '위계외': 0}
+            # 폴리곤별 요약통계 (격자 centroid 배정)
+            cands = []
             for parts, members, src in ((parts12, c12, '집적지1·2'),
                                         (kept3, c3, '집적지3')):
-                stats = self._assign(parts, members)
-                for p, (n, pr, pw) in zip(parts, stats):
-                    area = p.area() / 1e6
-                    dens = pr / area if area > 0 else 0.0
-                    wdens = pw / area if area > 0 else 0.0
-                    # 4조건 위계: 주거밀도·주거수 + 근무밀도·근무수 (0=무시)
-                    if (dens >= th[self.T1_DENS] and pr >= th[self.T1_POP]
-                            and wdens >= th[self.T1_WDENS] and pw >= th[self.T1_WPOP]):
-                        tier = '1차'
-                    elif (dens >= th[self.T2_DENS] and pr >= th[self.T2_POP]
-                            and wdens >= th[self.T2_WDENS] and pw >= th[self.T2_WPOP]):
-                        tier = '2차'
-                    elif (dens >= th[self.T3_DENS]
-                            and wdens >= th[self.T3_WDENS] and pw >= th[self.T3_WPOP]):
-                        tier = '3차'
-                    else:
-                        tier = '위계외'
-                    n_out[tier] += 1
-                    feat = QgsFeature(out_fields)
-                    feat.setGeometry(p)
-                    feat['year'], feat['tier'], feat['src'] = year, tier, src
-                    feat['n_grid'], feat['pop_r'], feat['pop_w'] = n, round(pr, 1), round(pw, 1)
-                    feat['area_km2'], feat['dens_r'] = round(area, 4), round(dens, 1)
-                    sink.addFeature(feat, QgsFeatureSink.FastInsert)
-                    s = summary.setdefault((year, tier), [0, 0.0, 0.0, 0.0])
-                    s[0] += 1
-                    s[1] += area
-                    s[2] += pr
-                    s[3] += pw
+                for p, (n, pr, pw) in zip(parts, self._assign(parts, members)):
+                    cands.append((p, src, n, pr, pw))
+
+            # 후처리 (선택): 읍면동별 중복 제거 → 중심지 간 최소 거리
+            if emd_index is not None:
+                cands, nrm = self._dedup_emd(cands, emd_index, emd_geoms, emd_tr)
+                feedback.pushInfo(f'  읍면동 중복 제거: {nrm}개 제거 → {len(cands)}개')
+            if min_dist > 0:
+                cands, nrm = self._min_distance(cands, min_dist)
+                feedback.pushInfo(f'  중심지 간 최소 거리 {min_dist:,.0f} m: {nrm}개 제거 → {len(cands)}개')
+
+            # 4단계: 위계 구분
+            n_out = {'1차': 0, '2차': 0, '3차': 0, '위계외': 0}
+            for p, src, n, pr, pw in cands:
+                area = p.area() / 1e6
+                dens = pr / area if area > 0 else 0.0
+                wdens = pw / area if area > 0 else 0.0
+                # 4조건 위계: 주거밀도·주거수 + 근무밀도·근무수 (0=무시)
+                if (dens >= th[self.T1_DENS] and pr >= th[self.T1_POP]
+                        and wdens >= th[self.T1_WDENS] and pw >= th[self.T1_WPOP]):
+                    tier = '1차'
+                elif (dens >= th[self.T2_DENS] and pr >= th[self.T2_POP]
+                        and wdens >= th[self.T2_WDENS] and pw >= th[self.T2_WPOP]):
+                    tier = '2차'
+                elif (dens >= th[self.T3_DENS]
+                        and wdens >= th[self.T3_WDENS] and pw >= th[self.T3_WPOP]):
+                    tier = '3차'
+                else:
+                    tier = '위계외'
+                n_out[tier] += 1
+                feat = QgsFeature(out_fields)
+                feat.setGeometry(p)
+                feat['year'], feat['tier'], feat['src'] = year, tier, src
+                feat['n_grid'], feat['pop_r'], feat['pop_w'] = n, round(pr, 1), round(pw, 1)
+                feat['area_km2'], feat['dens_r'] = round(area, 4), round(dens, 1)
+                sink.addFeature(feat, QgsFeatureSink.FastInsert)
+                s = summary.setdefault((year, tier), [0, 0.0, 0.0, 0.0])
+                s[0] += 1
+                s[1] += area
+                s[2] += pr
+                s[3] += pw
             feedback.pushInfo(
                 '  위계: ' + ' / '.join(f'{k} {v}개' for k, v in n_out.items() if v))
             if n_out['위계외']:
@@ -344,6 +437,8 @@ class CenterIdentifyAlgorithm(QgsProcessingAlgorithm):
             '  1) 격자 분류 — 집적지1/2/3/주변 (주거·근무인구 임계값)\n'
             '  2) 집적지1+2 묶음·집적지3 별도 100m 버퍼 병합\n'
             '  3) 집적지1/2 폴리곤 1km 이내의 집적지3 폴리곤 제거\n'
+            '  (선택) 읍면동별 중복 제거 — 읍면동마다 주거인구 최대 1개 (읍면동 경계 필요)\n'
+            '  (선택) 중심지 간 최소 거리 — 주거인구 큰 순으로 남기고, 경계 간 거리 기준 미만 제거\n'
             '  4) 폴리곤 주거인구 밀도·수로 1·2·3차 위계 구분 (UN DEGURBA)\n\n'
             '━ 출력\n'
             '  · 중심지 폴리곤: year·tier·src·n_grid·pop_r·pop_w·area_km2·dens_r\n'

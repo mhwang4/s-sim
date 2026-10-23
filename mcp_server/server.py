@@ -641,7 +641,8 @@ def _job_config(region, out_dir, steps, **opts):
 def run_pipeline(region: str = '', steps: list[str] | None = None, out_dir: str = '',
                  min_density: int = 150, city_type: str = '거점', use_work_criteria: bool = True,
                  fac_radius: float | None = None, fac_minpop: float | None = None,
-                 fac_radius_hub: float | None = None, fac_minpop_hub: float | None = None) -> dict:
+                 fac_radius_hub: float | None = None, fac_minpop_hub: float | None = None,
+                 dedup_by_emd: bool = True, min_center_dist: float = 1500) -> dict:
     """플러그인 전체 흐름을 메뉴 순서 그대로 실행 (백그라운드 작업). 플러그인 화면에서 버튼을 차례로
     누른 것과 같은 결과·결과 폴더를 만든다. 바로 job_id 를 돌려주므로 job_status 로 진행을 확인한다.
 
@@ -663,6 +664,11 @@ def run_pipeline(region: str = '', steps: list[str] | None = None, out_dir: str 
         use_work_criteria: 1·2차 위계에 근무인구 기준(표5)도 적용 (기본 True)
         fac_radius, fac_minpop, fac_radius_hub, fac_minpop_hub: KPI 시설 기준(생략하면 플러그인 기본값
             근린 1500m·500명, 거점 3000m·3000명)
+        dedup_by_emd: 중심지 읍면동별 중복 제거 — 읍면동마다 주거인구 최대 1개 유지 (기본 True,
+            중심지 후보 추출·장래 중심지 식별 공통)
+        min_center_dist: 중심지 간 최소 거리(m, 폴리곤 경계 간 직선거리). 주거인구 큰 순으로 남기고
+            남긴 중심지와 이 거리 미만인 중심지는 상위 중심지의 영향권으로 보고 제거. 0이면 적용 안 함
+            (기본 1500, 중심지 후보 추출·장래 중심지 식별 공통)
     """
     bad = [s for s in (steps or []) if s not in _STEPS]
     if bad:
@@ -675,7 +681,8 @@ def run_pipeline(region: str = '', steps: list[str] | None = None, out_dir: str 
     cfg = _job_config(region, out_dir, steps, min_density=int(min_density), city_type=city_type,
                       use_work_criteria=bool(use_work_criteria), kpi_scope='all',
                       fac_radius=fac_radius, fac_minpop=fac_minpop,
-                      fac_radius_hub=fac_radius_hub, fac_minpop_hub=fac_minpop_hub)
+                      fac_radius_hub=fac_radius_hub, fac_minpop_hub=fac_minpop_hub,
+                      dedup_by_emd=bool(dedup_by_emd), min_center_dist=float(min_center_dist or 0))
     job = _start_job('pipeline', cfg)
     return {'job_id': job['id'], 'region': cfg['region'], 'steps': [_STEP_LABEL[s] for s in steps],
             'result_root': _result_root(cfg['region'], cfg['out_dir']),

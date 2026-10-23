@@ -307,12 +307,18 @@ pop(g, y) = P(s, y) × w(g) / Σ w(g′)   (g′ ∈ 시군구 s)
    100m 외부 버퍼 → 유니온 → 100m 내부 버퍼로 폴리곤 생성
 ③ 집적지3 폴리곤 중 집적지1/2 폴리곤과 거리 1km 이내 제거
    (독립적으로 기능하는 소규모 저밀 집적지만 선별)
+   선택 시: 읍면동별 중복 제거 — 교차 면적 최대 읍면동에 배정, 읍면동마다 주거인구 최대 1개
+   선택 시: 중심지 간 최소 거리(기본 1,500m) — 주거인구 큰 순으로 남기고,
+            남긴 폴리곤과 경계 간 직선거리가 기준 미만이면 상위 중심지의 영향권으로 보고 제거
 ④ 위계 구분 - 폴리곤 주거인구 밀도 및 수, 근무인구 밀도 및 수로 사용자가 설정한 기준으로 위계 구분'''),
     'wf_center': ('중심지 추출 및 위계 분류 — 후보 추출 → 속성 추출 → 위계 설정', '''\
 ① 후보 추출
    후보그룹1 = 국토공간거점지도의 거점 유형이 중심지Ⅰ·중심지Ⅱ인 격자
    후보그룹2 = 거주인구밀도 ≥ 임계값(기본 300)인 격자 (그룹1 1km 밖)
    각각 100m 버퍼 → 병합해 후보 폴리곤 생성
+   선택 시: 읍면동별 중복 제거 — 읍면동마다 거주인구 합계 최대 후보 1개
+   선택 시: 중심지 간 최소 거리(기본 1,500m) — 거주인구 합계 큰 순으로 남기고,
+            남긴 후보와 경계 간 직선거리가 기준 미만이면 상위 중심지의 영향권으로 보고 제거
    선택 시: 읍면동을 토대로 중심지 이름 부여
 ② 속성 추출 (인구 통계)
    후보 폴리곤과 교차하는 격자를 공간 집계:
@@ -849,6 +855,7 @@ class PopAllocDialog(QDialog):
             put(self.grid_file.get(d), grid, f'{nm}인구 배분 · 격자')
             put(self.zone_file.get(d), dev, f'{nm}인구 배분 · 개발사업')
         put(self.table_file.get(RES), self._region_file(reg, 'resid_proj'), '거주인구 배분 · 추계 테이블')
+        put(getattr(self, 'ctr_emd_file', None), emd, '장래 중심지 식별 · 읍면동')
         put(getattr(self, 'infra_file', None), self._region_file(reg, 'infra_1km'), '거점 유도 · 생활인프라')
         put(getattr(self, 'emp_file', None), self._region_file(reg, 'emp_rate'), '근무인구 추계 · 고용률')
         put(getattr(self, 'pop15_file', None), self._region_file(reg, 'pop15_proj'), '근무인구 추계 · 15세 이상 인구')
@@ -980,6 +987,7 @@ class PopAllocDialog(QDialog):
         yield 'devw_csv', self.devw_csv
         yield 'ctr_res', self.ctr_res_file
         yield 'ctr_work', self.ctr_work_file
+        yield 'ctr_emd', self.ctr_emd_file
         yield 'ctr_out', self.ctr_out
         yield 'ctr_csv', self.ctr_csv
         for k, fw in self.viz_files.items():
@@ -1733,6 +1741,18 @@ class PopAllocDialog(QDialog):
         form.addRow('', QLabel('<span style="color:gray">각 조건 체크 시 적용, 해제 시 무시. '
                                '조건은 AND 결합. 전남광주 프리셋 기본값.</span>'))
 
+        # 후처리 (선택) — 중심지-생활권 분석 ① 후보 추출과 같은 규칙
+        self.ctr_emd_file = self._open_widget(lambda p: None)
+        form.addRow('읍면동 경계 (선택)', self._file_row(self.ctr_emd_file, 'sp_emd'))
+        self.ctr_dedup = QCheckBox('읍면동별 중복 제거 (읍면동 내 주거인구 최대 중심지 1개만 유지)')
+        self.ctr_dedup.setChecked(True)
+        form.addRow(self.ctr_dedup)
+        self.ctr_mind_u = QCheckBox('중심지 간 최소 거리 적용')
+        self.ctr_mind_u.setChecked(True)
+        self.ctr_mind = spin(1500, 100000)
+        self.ctr_mind_u.toggled.connect(self.ctr_mind.setEnabled)
+        form.addRow(pair_row(self.ctr_mind_u, self.ctr_mind, ('m (폴리곤 경계 간 직선거리 — 안쪽의 작은 중심지 제거)',)))
+
         self.ctr_out = self._save_widget('GeoPackage (*.gpkg)')
         form.addRow('중심지 폴리곤 저장 파일', self.ctr_out)
         self.ctr_csv = self._save_widget('CSV (*.csv)')
@@ -1777,6 +1797,10 @@ class PopAllocDialog(QDialog):
             'T2_WDENS': cv(self.ctr_t2wd, self.ctr_t2wd_u), 'T2_WPOP': cv(self.ctr_t2wp, self.ctr_t2wp_u),
             'T3_DENS': cv(self.ctr_t3d, self.ctr_t3d_u),
             'T3_WDENS': cv(self.ctr_t3wd, self.ctr_t3wd_u), 'T3_WPOP': cv(self.ctr_t3wp, self.ctr_t3wp_u),
+            'EMD_LAYER': self.ctr_emd_file.filePath().strip() or None,
+            'DEDUP_BY_EMD': self.ctr_dedup.isChecked(),
+            'MIN_DIST_APPLY': self.ctr_mind_u.isChecked(),
+            'MIN_DIST': int(self.ctr_mind.value()),
             'OUTPUT': self._ctr_out_path(res, self.ctr_out, '중심지_식별.gpkg'),
             'OUTPUT_CSV': self._ctr_out_path(res, self.ctr_csv, '중심지_요약.csv'),
         }
@@ -1889,7 +1913,8 @@ class PopAllocDialog(QDialog):
                 dict(alg='extract_candidates', label='중심지 후보 추출',
                      common={'GEOJEOM_LAYER': 'grid', 'EMD_LAYER': 'emd'},
                      expose=['TYPE_FIELD', 'POP_FIELD', 'POP_THRESHOLD',
-                             'EMD_NAME_FIELD', 'DEDUP_BY_EMD'],
+                             'EMD_NAME_FIELD', 'DEDUP_BY_EMD',
+                             'MIN_DIST_APPLY', 'MIN_DIST'],
                      outs={'OUTPUT': '중심지후보_통합.gpkg',
                            'OUTPUT_GROUP1': '중심지후보_그룹1.gpkg',
                            'OUTPUT_GROUP2': '중심지후보_그룹2.gpkg'},

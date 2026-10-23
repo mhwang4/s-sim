@@ -9,6 +9,7 @@ MCP 서버(server.py)가 별도 프로세스로 실행한다:  python pipeline_r
   region, out_dir, datapack, plugin_parent,
   steps: ["population", "future_centers", "centers_zones", "kpi", "viz"] 중 일부(순서대로 실행)
   min_density(100·150·200·300), city_type(거점·강소·자립), use_work_criteria(bool),
+  dedup_by_emd(bool, 기본 True), min_center_dist(m, 기본 1500, 0=미적용) — 중심지 후보 추출·장래 중심지 식별 공통,
   kpi_scope(all·basic·compact·network·life), fac_radius, fac_minpop, fac_radius_hub, fac_minpop_hub
 """
 import json
@@ -127,8 +128,30 @@ if ok and 'population' in steps:
     run_step('근무 ① BAU 배분', lambda: d._run_bau(DM.WORK), 'work_bau')
     run_step('근무 ② 계획인구 반영 배분', lambda: d._run_plan(DM.WORK), 'work_plan')
 
+DEDUP = bool(CFG.get('dedup_by_emd', True))
+MIN_DIST = float(CFG.get('min_center_dist', 1500) or 0)
+
+
+def center_options_future():
+    """장래 중심지 식별 화면의 후처리 옵션(읍면동 중복 제거·중심지 간 최소 거리)."""
+    d.ctr_dedup.setChecked(DEDUP)
+    d.ctr_mind_u.setChecked(MIN_DIST > 0)
+    if MIN_DIST > 0:
+        d.ctr_mind.setValue(MIN_DIST)
+
+
+def center_options_flow():
+    """중심지-생활권 분석 ① 후보 추출 단계의 같은 옵션."""
+    w = d._flow_widgets[d._center_flow()['key']]
+    for key, val in (((0, 'DEDUP_BY_EMD'), DEDUP), ((0, 'MIN_DIST_APPLY'), MIN_DIST > 0)):
+        if key in w:
+            w[key].setChecked(val)
+    if MIN_DIST > 0 and (0, 'MIN_DIST') in w:
+        w[(0, 'MIN_DIST')].setValue(MIN_DIST)
+
+
 if ok and 'future_centers' in steps:
-    run_step('장래 중심지 식별', d._run_center, 'center')
+    run_step('장래 중심지 식별', lambda: (center_options_future(), d._run_center()), 'center')
 
 if ok and 'centers_zones' in steps:
     def preset():
@@ -141,6 +164,7 @@ if ok and 'centers_zones' in steps:
         d._hier_city.setCurrentText(city)
         d._hier_work.setChecked(bool(CFG.get('use_work_criteria', True)))
         d._apply_hier_preset(d._center_flow(), d._flow_widgets[d._center_flow()['key']])
+        center_options_flow()
     run_step('위계 기준 적용 (표4·표5)', preset, 'wf_center')
     for si in range(3):
         run_step(f'① 중심지 추출 및 위계 분류 {si + 1}단계', lambda i=si: d._run_center_step(i), 'wf_center')
