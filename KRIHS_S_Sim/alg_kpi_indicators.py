@@ -568,7 +568,7 @@ class KpiSpatialStructureIndicators(QgsProcessingAlgorithm):
             parentLayerParameterName=self.CENTERS, optional=True))
         self.addParameter(QgsProcessingParameterString(
             self.CENTER_HIER_ORDER,
-            self.tr("중심지 위계 순서(상위→하위, 선택; 비우면 수량 적은 위계가 고차)"),
+            self.tr("중심지 위계 순서(상위→하위, 선택; 비우면 값에 적힌 차수, 차수가 없으면 수량 적은 위계가 고차)"),
             optional=True))
         # 4. 기준년도 격자
         self.addParameter(QgsProcessingParameterFeatureSource(
@@ -902,8 +902,10 @@ class KpiSpatialStructureIndicators(QgsProcessingAlgorithm):
             k += 1
 
         # --- 위계 인식: 위계 필드의 서로 다른 값 = 각각 하나의 위계.
-        #     순서(상위→하위)는 (1) 사용자가 '위계 순서'를 적었으면 그대로,
-        #     (2) 없으면 수량 적은 위계를 고차로 (라벨 파싱 안 함). ---
+        #     (1) 사용자가 '위계 순서'를 적었으면 그 순서대로 1·2·3차,
+        #     (2) 값마다 차수(1/2/3)가 적혀 있으면 그 차수 그대로 — 중심지 위계 분류 결과('1차중심지' 등).
+        #         없는 위계는 비워 둠(예: 2차가 없으면 1차·3차),
+        #     (3) 그 밖에는 수량 적은 위계를 고차로. ---
         order_raw = self.parameterAsString(parameters, self.CENTER_HIER_ORDER, context) or ""
         manual_order = [t.strip() for t in order_raw.replace(";", ",").split(",") if t.strip()]
         hier_count = {}
@@ -912,14 +914,20 @@ class KpiSpatialStructureIndicators(QgsProcessingAlgorithm):
             if hv not in (None, "", "None"):
                 hier_count[hv] = hier_count.get(hv, 0) + 1
         if hier_count:
+            parsed = {h: _parse_tier(h) for h in hier_count}
             if manual_order:
                 ordered = [h for h in manual_order if h in hier_count]
                 ordered += sorted([h for h in hier_count if h not in ordered], key=lambda h: hier_count[h])
                 how = "사용자 지정"
+                tier_map = {h: i + 1 for i, h in enumerate(ordered)}
+            elif all(parsed.values()) and len(set(parsed.values())) == len(parsed):
+                ordered = sorted(hier_count, key=lambda h: parsed[h])
+                how = "위계 값의 차수 그대로"
+                tier_map = parsed
             else:
                 ordered = sorted(hier_count.keys(), key=lambda h: hier_count[h])  # 적을수록 고차
                 how = "수량순(적을수록 고차)"
-            tier_map = {h: i + 1 for i, h in enumerate(ordered)}
+                tier_map = {h: i + 1 for i, h in enumerate(ordered)}
             for m in center_meta.values():
                 m["tier"] = tier_map.get(m.get("hier_raw"))
             feedback.pushInfo("중심지 위계 %d종 인식(%s, 상위→하위): %s"
@@ -5024,7 +5032,9 @@ renderAll();
     if(k==="w"){ const c=A.center_ts, cb=B.center_ts;
       return "중심지 근무인구 "+f1(c[0].wpop/1e4)+"만 → "+f1(c[ti].wpop/1e4)+"만 명 ("+esc(B.name)+" "+f1(cb[ti].wpop/1e4)+"만 명)"; }
     if(k==="e"){ const q=i=>{ const c=A.conn_ts[i]; return c&&c.equity&&c.equity[0]?c.equity[0]:[]; };
-      return "1·2차 중심지까지 "+f1(q(0)[1])+" → "+f1(q(ti)[1])+"% · 1·2·3차 중심지까지 "+f1(q(0)[2])+" → "+f1(q(ti)[2])+"%"; }
+      // 누적 위계 이름은 실제 있는 위계로(2차가 없으면 1·3차). 대표값(첫 단계) 다음 단계들
+      const lv=((A.conn_ts[0]||{}).levels||["1차","1차+2차","1차+2차+3차"]).map(l=>String(l).replace(/차\+/g,"·"));
+      return lv.slice(1).map((l,j)=>l+" 중심지까지 "+f1(q(0)[j+1])+" → "+f1(q(ti)[j+1])+"%").join(" · "); }
     if(k==="f"){ const g=A.fac_ts_g||{}, out=[];
       const ks=[$("evFN").value,$("evFH").value].filter((v,i,a)=>v&&g[v]&&g[v][0]&&a.indexOf(v)===i);
       ks.forEach(f=>out.push(fnm(f)+" "+f1(g[f][0].cover)+" → "+f1(g[f][ti].cover)+"%"));

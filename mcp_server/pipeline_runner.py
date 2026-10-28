@@ -213,7 +213,7 @@ def kpi_summary(kdir):
 
     - 시나리오마다 연도별 값(기준연도~목표연도) — 성과 평가(목표 대비 판정)에 그대로 쓸 수 있음
     - ③ 접근 형평성 대표값 = 1차 중심지까지 30분 내 도달 인구 비율(리포트·성과 평가 지원과 같음),
-      1·2차·1·2·3차는 참고
+      그 아래 누적 위계(1·2차·1·2·3차, 없는 위계는 빠짐)는 참고
     - ① 은 과거(내장 SGIS 격자) 값도 함께
     """
     from KRIHS_S_Sim.alg_kpi_indicators import merge_payloads, AREA_JSON_NAMES
@@ -244,7 +244,9 @@ def kpi_summary(kdir):
         if conn and conn[0]:
             eq = [((c or {}).get('equity') or [[None, None, None]])[0] for c in conn]
             o['③ 중심지 접근 형평성(%) — 1차 중심지까지(대표값)'] = [r1(e[0]) for e in eq]
-            o['③ 참고 — 1·2차 / 1·2·3차 중심지까지(%)'] = [[r1(x) for x in e[1:]] for e in eq]
+            # 누적 위계 이름은 실제 있는 위계로(예: 2차가 없으면 '1·3차'). 기본은 1·2차 / 1·2·3차
+            lv = [str(l).replace('차+', '·') for l in ((conn[0] or {}).get('levels') or ['1차', '1차+2차', '1차+2차+3차'])]
+            o[f"③ 참고 — {' / '.join(lv[1:])} 중심지까지(%)"] = [[r1(x) for x in e[1:]] for e in eq]
         fac = {}
         for gk, v in (sc.get('fac_ts_g') or {}).items():
             if gk.startswith('t:') and v:
