@@ -10,13 +10,15 @@ echo  KRIHS S-Sim 플러그인 설치
 echo ==================================================
 echo.
 
-if not exist "%SRC%\metadata.txt" (
-    echo [오류] 설치할 플러그인 폴더를 찾을 수 없습니다.
-    echo        압축을 푼 폴더 안에서 이 파일을 실행하세요.
-    echo        확인 경로: %SRC%
-    pause
-    exit /b 1
-)
+rem 경로에 괄호가 있으면(예: D:\(일반) ...) 괄호 블록 안의 %SRC%가 블록을 닫아 버리므로 블록을 쓰지 않음
+if exist "%SRC%\metadata.txt" goto copy
+echo [오류] 설치할 플러그인 폴더를 찾을 수 없습니다.
+echo        압축을 푼 폴더 안에서 이 파일을 실행하세요.
+echo        확인 경로: %SRC%
+pause
+exit /b 1
+
+:copy
 
 echo 설치 위치: %DST%
 echo QGIS가 켜져 있으면 먼저 종료하세요.

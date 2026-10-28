@@ -2,7 +2,7 @@
 name=KRIHS S-Sim
 qgisMinimumVersion=3.16
 description=Spatial Structure Simulation Analysis Tool — 분석 지역 설정(S-Sim 데이터팩) + 거주·근무인구 1km 격자 배분(BAU/거점유도/계획인구 반영) + 장래 중심지 전망 + 중심지·생활권 분석(위계·OD·기초·상위생활권) + 공간구조 KPI 진단·종합 리포트 + deck.gl 3D 시각화
-version=1.0.1
+version=1.0.2
 author=국토연구원 손종혁
 email=
 about=시군구 단위 인구 추계(통계청·KOTI·지자체 계획인구)를 국토공간거점지도 1km 격자로 재배분하고, 장래 중심지 식별과 생활권 경계 도출까지 수행하는 QGIS 통합 플러그인. 입력 데이터는 INPUT_SPEC.md 표준을 따른다.
