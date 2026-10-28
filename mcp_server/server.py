@@ -12,12 +12,15 @@ MCP 클라이언트 등록은 설치_mcp.bat / README.md 참조.
   - 실행 이력:  결과 저장 위치의 MCP_실행결과\\run_log.jsonl (작업 기록은 MCP_실행결과\\작업기록\\)
 결과 폴더 구성은 플러그인과 같다(장래인구 격자 배분 및 중심지 전망 / 중심지 및 생활권 분석 / KPI 지표 계산).
 """
+import concurrent.futures
 import contextlib
 import functools
 import gc
 import glob
 import json
 import os
+import queue
+import re
 import sys
 import tempfile
 import time
@@ -123,11 +126,45 @@ except ImportError:
             pass
 
 
-def _tool():
+# QGIS 작업 전용 스레드 — mcp 패키지는 동기 tool을 anyio 워커 스레드에서 돌리는데, 이 스레드는 쉬면
+# 사라지고 다음 호출은 새 스레드가 받는다. QGIS 타원체 거리·면적 계산(QgsDistanceArea)은 처음 계산한
+# 스레드가 사라진 뒤 다른 스레드에서 NaN을 내므로(도로 그래프 링크 길이 전부 NaN → OD가 자기 격자만 남음),
+# QGIS를 쓰는 tool은 서버가 꺼질 때까지 유지되는 이 스레드 하나에서만 실행한다.
+_QGIS_POOL = concurrent.futures.ThreadPoolExecutor(max_workers=1, thread_name_prefix='qgis')
+_PROGRESS = queue.Queue()   # (ctx, 진행률, 메시지) — QGIS 스레드가 넣고 tool 호출 스레드가 클라이언트로 보냄
+
+
+def _relay_progress():
+    while True:
+        try:
+            ctx, progress, msg = _PROGRESS.get_nowait()
+        except queue.Empty:
+            return
+        try:  # tool 호출 스레드(anyio 워커)에서 이벤트루프에 위임
+            anyio.from_thread.run(ctx.report_progress, progress, 100.0, msg)
+        except Exception:
+            pass
+
+
+def _on_qgis_thread(fn, *args, **kwargs):
+    fut = _QGIS_POOL.submit(fn, *args, **kwargs)
+    while True:
+        try:
+            result = fut.result(timeout=0.5)
+            break
+        except concurrent.futures.TimeoutError:
+            _relay_progress()
+    _relay_progress()
+    return result
+
+
+def _tool(qgis=False):
     def deco(fn):
         @functools.wraps(fn)
         def wrapper(*args, **kwargs):
             try:
+                if qgis:
+                    return _on_qgis_thread(fn, *args, **kwargs)
                 return fn(*args, **kwargs)
             except ToolError:
                 raise
@@ -167,10 +204,7 @@ class _Feedback(QgsProcessingFeedback):
         if self.ctx is None or anyio is None:
             return
         msg = self.log[-1] if self.log else None
-        try:  # 동기 tool은 워커 스레드에서 돌므로 from_thread로 이벤트루프에 위임
-            anyio.from_thread.run(self.ctx.report_progress, float(progress), 100.0, msg)
-        except Exception:
-            pass
+        _PROGRESS.put((self.ctx, float(progress), msg))   # QGIS 스레드 → tool 호출 스레드가 전달(_relay_progress)
 
     def _on_progress(self, p):
         step = int(p // 10)  # 10% 단위로만 전송
@@ -410,7 +444,7 @@ def _run(alg, resolved: dict, ctx) -> dict:
 
 
 # ---------------------------------------------------------------- MCP tools
-@_tool()
+@_tool(qgis=True)
 def check_environment() -> dict:
     """실행 환경 점검 — QGIS·S-Sim 플러그인 버전, 알고리즘 수, 데이터팩 위치와 지역, 결과 저장 위치.
 
@@ -469,7 +503,7 @@ def list_regions(region: str = '') -> list[dict]:
     return out
 
 
-@_tool()
+@_tool(qgis=True)
 def list_algorithms() -> list[dict]:
     """S-Sim 알고리즘 17종 목록 (id, 이름, 그룹).
 
@@ -482,7 +516,7 @@ def list_algorithms() -> list[dict]:
             for a in provider.algorithms()]
 
 
-@_tool()
+@_tool(qgis=True)
 def describe_algorithm(alg_id: str) -> dict:
     """알고리즘 1개의 파라미터 명세 — run_algorithm 호출 전에 확인.
 
@@ -507,13 +541,14 @@ def describe_algorithm(alg_id: str) -> dict:
                     '출력 파라미터는 생략하면 MCP_실행결과\\ 에 자동 저장.'}
 
 
-@_tool()
+@_tool(qgis=True)
 def run_algorithm(alg_id: str, params: dict, ctx: Context | None = None) -> dict:
     """알고리즘 실행 (17종 전부). describe_algorithm 으로 파라미터 확인 후 호출.
 
     입력 파일이 없거나 좌표계가 잘못됐으면 실행 전에 안내 메시지로 알려준다.
     실행 중 진행률을 보고하고, 결과에는 출력 파일별 피처 수·필드 요약이 붙는다.
     결과의 warnings(알고리즘 경고 전부, 예: 지정한 필드가 없어 대체 필드를 씀)는 사용자에게 전한다.
+    OD 알고리즘은 od_pairs(전체·성공·실패 쌍 수)를 함께 돌려준다. 실패(도달불가)가 있으면 사용자에게 알린다.
 
     Args:
         alg_id: 알고리즘 id ('krihs_ssim:' 접두는 생략 가능)
@@ -540,8 +575,29 @@ def run_algorithm(alg_id: str, params: dict, ctx: Context | None = None) -> dict
             resolved[p.name()] = _auto_output(alg, p)
     r = _run(alg, resolved, ctx)
     summary = {k: s for k, v in r['outputs'].items() if (s := _summarize_output(v))}
-    return {'outputs': r['outputs'], 'summary': summary, 'elapsed_sec': r['elapsed_sec'],
-            'warnings': r['warnings'], 'log': r['log'][-5:]}
+    out = {'outputs': r['outputs'], 'summary': summary, 'elapsed_sec': r['elapsed_sec'],
+           'warnings': r['warnings'], 'log': r['log'][-5:]}
+    od = _od_counts(r['log'])
+    if od:
+        out['od_pairs'] = od
+        if od['실패']:
+            out['warnings'] = out['warnings'] + [
+                f"OD {od['전체']:,}쌍 중 {od['실패']:,}쌍은 거리가 계산되지 않아(도달불가) 결과에서 빠짐 — "
+                f"성공 {od['성공']:,}쌍만 저장됨"]
+    return out
+
+
+_OD_DONE = re.compile(r'([\d,]+)행 \(도달불가 ([\d,]+) 제외\)')
+
+
+def _od_counts(log):
+    """OD 알고리즘(격자→중심지·중심지 간) 완료 로그 → 성공·실패 쌍 수. OD가 아니면 None."""
+    for line in reversed(log):
+        m = _OD_DONE.search(line)
+        if m:
+            ok, ng = (int(g.replace(',', '')) for g in m.groups())
+            return {'전체': ok + ng, '성공': ok, '실패': ng}
+    return None
 
 
 # ---------------------------------------------------------------- 플러그인 흐름 실행 (백그라운드 작업)
