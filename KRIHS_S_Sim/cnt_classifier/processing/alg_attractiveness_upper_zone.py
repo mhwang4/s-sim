@@ -42,7 +42,7 @@ _ZONE_NM_FIELD = "zone_nm"
 def _norm_id(v) -> str:
     """ID 값 문자열 정규화 — 필드 타입이 달라도 같은 번호는 같은 키가 되게.
 
-    Double 필드의 12.0 → '12', 공백 제거. '다바4321' 같은 문자 ID는 그대로.
+    Double 필드의 12.0 → '12', 공백 제거. '다라4785' 같은 문자 ID는 그대로.
     """
     s = str(v).strip()
     try:

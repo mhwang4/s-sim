@@ -14,7 +14,7 @@ import re
 YEAR_POP = re.compile(r'^pop_(\d{4})$')   # 시군구 추계 테이블
 YEAR_ANY = re.compile(r'^(?:pop_)?(\d{4})(?:년)?$')   # 2030 / 2030년 / pop_2030
 
-# KOTI 개발계획 연도별 입주율 (한국교통연구원 2025, 충남 장래 중심지 분석 표 2-4)
+# KOTI 개발계획 연도별 입주율 (한국교통연구원 2025)
 # (계획인구 하한, (준공연도 D부터의 연도별 비율))
 ENTRY_RATES = (
     (100_000, (0.30, 0.20, 0.20, 0.20, 0.10)),
@@ -112,7 +112,7 @@ def load_sgg_table(path):
     return table, sorted(year_cols), n_null
 
 
-# ── 장래 근무인구 추계 (충남 PDF 2장 방식) ───────────────
+# ── 장래 근무인구 추계 (앵커 기반) ───────────────────────
 def load_long_table(path):
     """(지역, 연도, 값) 3열 long 테이블 → {지역: {연도: float}}.
 
@@ -169,7 +169,7 @@ def load_wide_year_table(path):
 
 
 def worker_projection(emp_rates, pop15, anchors):
-    """시·군 장래 근무인구 추계 — 충남 장래 중심지 분석(2026) 2장 방식.
+    """시·군 장래 근무인구 추계 — 앵커 기반 방식.
 
     1) 고용률 시계열의 연평균 증감률(CAGR)을 마지막 관측 고용률에 적용해 장래 고용률 산출
     2) 취업자(y) = 장래 고용률(y)/100 × 15세 이상 장래인구(y)

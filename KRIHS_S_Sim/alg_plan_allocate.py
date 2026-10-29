@@ -1,8 +1,7 @@
 # -*- coding: utf-8 -*-
 """3. 계획인구 격자 배분 — 개발사업 계획인구·입주율 기반 개발/비개발 분리 배분.
 
-로직 근거: '충청남도 장래 중심지 분석' (2026-07-25 pdf) 2.1절
-  1단계  사업별 계획인구를 KOTI 입주율 규칙(표 2-4)으로 준공연도부터 연도 분산,
+  1단계  사업별 계획인구를 KOTI 입주율 규칙으로 준공연도부터 연도 분산,
          유입연도 y는 y보다 큰 최소 목표연도에 반영 → 시군·목표연도별 개발지구 인구
   2단계  비개발지구 인구(= 시군 추계 총량 − 개발지구 인구)를
          직전 시점 격자인구 비중에 단순 비례 배분 (최초 시점은 기준연도 격자인구)
@@ -98,14 +97,14 @@ class PlanAllocateAlgorithm(QgsProcessingAlgorithm):
         ))
         self.addParameter(QgsProcessingParameterField(
             self.Z_POP_FIELD,
-            '↳ 계획인구 필드 (기본: plan_pop / 충남 KOTI: pop_plan)',
+            '↳ 계획인구 필드 (기본: plan_pop)',
             defaultValue='plan_pop',
             parentLayerParameterName=self.ZONE_LAYER,
             type=QgsProcessingParameterField.Numeric,
         ))
         self.addParameter(QgsProcessingParameterField(
             self.Z_YR_FIELD,
-            '↳ 준공연도 필드 (기본: yr_done / 충남 KOTI: comp_yr)',
+            '↳ 준공연도 필드 (기본: yr_done)',
             defaultValue='yr_done',
             parentLayerParameterName=self.ZONE_LAYER,
         ))
@@ -259,7 +258,7 @@ class PlanAllocateAlgorithm(QgsProcessingAlgorithm):
         """시군별 원단위 = Σ기준인구(pop_field) / Σ분모(ratio_field).
 
         근무인구 배분 시 개발지구 유입 = 계획인구(거주) × 원단위(주거 1인당 근무인구).
-        분모 합 0이면 1.0 처리 + 경고. (충남 PDF 표 2-8 방식)
+        분모 합 0이면 1.0 처리 + 경고.
         """
         num, den = {}, {}
         for feat in layer.getFeatures():
@@ -448,7 +447,7 @@ class PlanAllocateAlgorithm(QgsProcessingAlgorithm):
     def shortHelpString(self):
         return (
             '시군구 장래인구 추계를 개발사업(장래토지이용계획)을 반영하여 1km 격자에\n'
-            '배분합니다. 충청남도 장래 중심지 분석(2026)의 계획인구 배분 방법과 동일.\n\n'
+            '배분합니다.\n\n'
             '━ 입력\n'
             '  · 격자 레이어: gid, sgg_cd_h, 기준연도 인구 필드\n'
             '  · 추계 테이블(csv/xlsx): sgg_cd_h + pop_YYYY — 시군 총량은 이 값 유지\n'
@@ -457,7 +456,7 @@ class PlanAllocateAlgorithm(QgsProcessingAlgorithm):
             '    구간 판정용), 관할 시군(선택 — 있으면 해당 시군 격자로만\n'
             '    배분, 없으면 교차 시군 1/n 분할)\n'
             '  ※ 필드명이 표준(plan_pop/yr_done 등)과 달라도 각 ↳ 필드\n'
-            '    파라미터에서 선택하면 됨 (예: 충남 KOTI pop_plan/comp_yr)\n'
+            '    파라미터에서 선택하면 됨\n'
             '  ※ 개발격자 판정: 사업 경계가 걸린(교차) 모든 격자에 배분\n\n'
             '━ 처리 단계\n'
             '  1) 사업별 계획인구를 KOTI 입주율 규칙으로 준공연도부터 연도 분산\n'
