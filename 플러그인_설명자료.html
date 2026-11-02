@@ -202,7 +202,7 @@ main section.sec .wrap{width:auto;margin:0}
 <header class="hero"><div class="wrap">
   <span class="eyebrow">QGIS 플러그인 설명자료 · 2026</span>
   <h1>공간구조 시뮬레이션 분석도구 S-Sim</h1>
-  <p class="lead" style="margin-bottom:2px;font-size:15px;color:#8a93a3">Spatial Structure Simulation Analysis Tool · v1.0.3</p>
+  <p class="lead" style="margin-bottom:2px;font-size:15px;color:#8a93a3">Spatial Structure Simulation Analysis Tool · v1.0.4</p>
   <div class="flows">
     <div class="flow">
       <span class="s">분석 지역 설정</span><span class="a">→</span>
@@ -845,7 +845,8 @@ main section.sec .wrap{width:auto;margin:0}
   </ul>
   <ul>
     <li><span class="nb">도시위상 ·</span> 인구추세 유형은 대시보드의 가이드라인 참조값 비교에 사용.</li>
-    <li><span class="nb">시설 기준 기본값:</span> <span class="nb">근린 1.5km ·</span> <span class="nb">500명,</span> <span class="nb">거점 3km ·</span> <span class="nb">3,000명.</span></li>
+    <li><span class="nb">시설 기준 기본값:</span> <span class="nb">근린 1.5km ·</span> <span class="nb">1,000명,</span> <span class="nb">거점 5km ·</span> <span class="nb">2,500명.</span></li>
+    <li><span class="nb">중심지 밀도 참고치 기본값:</span> <span class="nb">340명/km²</span> <span class="nb">(리포트 화면에서 다시 선택 가능).</span></li>
   </ul>
   </div>
   <figure><img src="docs_img/a_KPI공통.png" alt="KPI 공통 데이터 화면"><figcaption><span class="nb">KPI 공통 데이터 -</span> <span class="nb">중심지-생활권 분석 후 자동 연결된 상태</span></figcaption></figure>
@@ -1052,6 +1053,9 @@ main section.sec .wrap{width:auto;margin:0}
   <ul>
     <li><span class="nb">참조값 =</span> <span class="nb">같은 도시위상·인구추세 유형의 중위값</span> <span class="nb">(가이드라인) -</span> <span class="nb">지역 값이 어느 수준인지 비교용.</span></li>
     <li>④ 서비스권 향유도는 선택 막대의 근린·거점 시설 기준, <span class="nb">폐점 예상 시설 수 함께 표시.</span></li>
+    <li><span class="nb">아래 두 표(계획권역 전체 ·</span> 생활권별)의 인구과소지역 비율은 전체 격자 기준과 거주 격자(주거인구가 있는 격자) 기준을 함께 표시.</li>
+    <li>밀도 참고치 미달 중심지는 1·2·3차 위계별로 표시. 미달 중심지와 폐점 예상 시설은 '해당/전체' 개수로 표시 <span class="nb">(예:</span> <span class="nb">104/174곳).</span></li>
+    <li><span class="nb">밀도 참고치는 선택 막대에서 340 ·</span> <span class="nb">1,000 ·</span> <span class="nb">1,500명/km² 또는 직접입력 -</span> <span class="nb">바꾸면 미달 중심지 수를 바로 다시 셈.</span></li>
   </ul>
   </div>
   <figure><img src="docs_img/b_리포트_대시보드.png" alt="진단 요약 탭"><figcaption><span class="nb">진단 요약 -</span> <span class="nb">전남광주통합특별시</span></figcaption></figure>
@@ -1081,7 +1085,7 @@ main section.sec .wrap{width:auto;margin:0}
   <ul class="keys">
     <li><span class="bdg">1</span><span class="nb"><b>중심지 지도</b> -</span> <span class="nb">위계색</span> <span class="nb">(1차 빨강 ·</span> <span class="nb">2차 주황 ·</span> <span class="nb">3차 초록)</span></li>
     <li><span class="bdg">2</span><span class="nb"><b>위계 누적 집합</b> -</span> <span class="nb">1차 /</span> <span class="nb">1차+2차 /</span> <span class="nb">1차+2차+3차로 넓혀 가며 핵심지표 비교</span></li>
-    <li><span class="bdg">3</span><span class="nb"><b>참고지표 - 위계별</b> -</span> <span class="nb">중심지 주거·근무 밀도,</span> 밀도 참고치(2,000명/㎢) 미달 중심지 수</li>
+    <li><span class="bdg">3</span><span class="nb"><b>참고지표 - 위계별</b> -</span> <span class="nb">중심지 주거·근무 밀도,</span> <span class="nb">밀도 참고치 미달 중심지 수(미달/전체)</span></li>
     <li><span class="bdg">4</span><span class="nb"><b>상세 분석</b> -</span> <span class="nb">위계별 지표 표 ·</span> <span class="nb">인구 수/밀도 ·</span> <span class="nb">추이 ·</span> <span class="nb">중심지 인구 비중 ·</span> <span class="nb">탄소 ·</span> <span class="nb">중심지 간 연결성(시간권,</span> <span class="nb">레이더 보기) ·</span> <span class="nb">생활편리성</span></li>
   </ul>
   </div>

@@ -585,7 +585,7 @@ class KpiSpatialStructureIndicators(QgsProcessingAlgorithm):
             options=self._TREND_TYPES, defaultValue=0, optional=True))
         self.addParameter(QgsProcessingParameterNumber(
             self.DENS_REF, self.tr("중심지 밀도 참고치 (명/㎢, 참고치 미달 중심지 수 산출용)"),
-            type=QgsProcessingParameterNumber.Double, defaultValue=2000.0, optional=True))
+            type=QgsProcessingParameterNumber.Double, defaultValue=340.0, optional=True))
         self.addParameter(QgsProcessingParameterField(
             "RESID1", self.tr("기준년도 주거인구 필드"),
             parentLayerParameterName="GRID1",
@@ -631,13 +631,13 @@ class KpiSpatialStructureIndicators(QgsProcessingAlgorithm):
             type=QgsProcessingParameterNumber.Double, defaultValue=1500.0, optional=True))
         self.addParameter(QgsProcessingParameterNumber(
             self.FAC_RADIUS_HUB, self.tr("   향유도 서비스반경 — 거점 (직선, m)"),
-            type=QgsProcessingParameterNumber.Double, defaultValue=3000.0, optional=True))
+            type=QgsProcessingParameterNumber.Double, defaultValue=5000.0, optional=True))
         self.addParameter(QgsProcessingParameterNumber(
             self.FAC_MINPOP, self.tr("   관리대상 최소 배후인구 — 근린 (미만이면 관리대상)"),
-            type=QgsProcessingParameterNumber.Double, defaultValue=500.0, optional=True))
+            type=QgsProcessingParameterNumber.Double, defaultValue=1000.0, optional=True))
         self.addParameter(QgsProcessingParameterNumber(
             self.FAC_MINPOP_HUB, self.tr("   관리대상 최소 배후인구 — 거점"),
-            type=QgsProcessingParameterNumber.Double, defaultValue=3000.0, optional=True))
+            type=QgsProcessingParameterNumber.Double, defaultValue=2500.0, optional=True))
         self.addParameter(QgsProcessingParameterString(
             self.FAC_MINPOP_BY_TYPE, self.tr("   유형별 최소배후 override (예: 대학=30000, 병원=1000)"),
             optional=True))
@@ -1699,7 +1699,8 @@ class KpiSpatialStructureIndicators(QgsProcessingAlgorithm):
         # 시나리오별 집계
         # =================================================================
         def y0():
-            return {"resid": 0.0, "work": 0.0, "has_work": False, "cells": 0, "sparse": 0}
+            # cells·sparse = 전체 격자 기준, rcells·rsparse = 거주 격자(주거인구 > 0) 기준
+            return {"resid": 0.0, "work": 0.0, "has_work": False, "cells": 0, "sparse": 0, "rcells": 0, "rsparse": 0}
 
         scen_results = []   # 각 시나리오의 계산 결과 dict (대시보드 payload용)
 
@@ -1761,6 +1762,10 @@ class KpiSpatialStructureIndicators(QgsProcessingAlgorithm):
                     region[yr]["cells"] += 1
                     if is_sparse:
                         region[yr]["sparse"] += 1
+                    if rv > 0:
+                        region[yr]["rcells"] += 1
+                        if is_sparse:
+                            region[yr]["rsparse"] += 1
 
                     if ck is not None:
                         cell_pop_year[yr][ck] = rv
@@ -1774,6 +1779,10 @@ class KpiSpatialStructureIndicators(QgsProcessingAlgorithm):
                         zone_pop[zid][yr]["cells"] += 1
                         if is_sparse:
                             zone_pop[zid][yr]["sparse"] += 1
+                        if rv > 0:
+                            zone_pop[zid][yr]["rcells"] += 1
+                            if is_sparse:
+                                zone_pop[zid][yr]["rsparse"] += 1
 
                     cid = locate(pt, center_index, center_geoms)
                     if cid is not None:
@@ -1807,6 +1816,7 @@ class KpiSpatialStructureIndicators(QgsProcessingAlgorithm):
                     "rdens": (resid / region_area) if region_area > 0 else None,
                     "wdens": (work / region_area) if (hw and region_area > 0) else None,
                     "sparse_ratio": (region[y]["sparse"] / region[y]["cells"] * 100.0) if region[y]["cells"] > 0 else None,
+                    "sparse_ratio_res": (region[y]["rsparse"] / region[y]["rcells"] * 100.0) if region[y]["rcells"] > 0 else None,
                 })
             region_change = {
                 "pop": _change_metrics([(y, region[y]["resid"]) for y in years]),
@@ -1854,6 +1864,8 @@ class KpiSpatialStructureIndicators(QgsProcessingAlgorithm):
                         "cpop": ctr_r,   # 생활권 내 중심지 인구
                         "cdens": (ctr_r / ctr_a) if ctr_a > 0 else None,   # 생활권 내 중심지 인구밀도
                         "sparse_ratio": (zone_pop[zid][y]["sparse"] / zcells * 100.0) if zcells > 0 else None,
+                        "sparse_ratio_res": (zone_pop[zid][y]["rsparse"] / zone_pop[zid][y]["rcells"] * 100.0)
+                        if zone_pop[zid][y]["rcells"] > 0 else None,
                     })
                 chg = {
                     "pop": _change_metrics([(y, zone_pop[zid][y]["resid"]) for y in years]),
@@ -2225,7 +2237,7 @@ class KpiSpatialStructureIndicators(QgsProcessingAlgorithm):
                 "multi_year": sr["multi_year"],
                 "region_ts": [{"year": r["year"], "pop": _r(r["pop"]), "work": _r(r["work"]),
                                "rdens": _r(r["rdens"]), "wdens": _r(r["wdens"]),
-                               "sparse_ratio": _r(r["sparse_ratio"])} for r in sr["region_ts"]],
+                               "sparse_ratio": _r(r["sparse_ratio"]), "sparse_ratio_res": _r(r["sparse_ratio_res"])} for r in sr["region_ts"]],
                 "region_change": sr["region_change"],
                 "center_ts": [{"year": r["year"], "pop": _r(r["pop"]), "wpop": _r(r["wpop"]),
                                "density": _r(r["density"]), "rconc": _r(r["rconc"]),
@@ -2235,7 +2247,7 @@ class KpiSpatialStructureIndicators(QgsProcessingAlgorithm):
                     "per_year": [{"year": p["year"], "pop": _r(p["pop"]), "rdens": _r(p["rdens"]),
                                   "wdens": _r(p["wdens"]), "crconc": _r(p["crconc"]),
                                   "cwconc": _r(p["cwconc"]), "cpop": _r(p["cpop"]), "cdens": _r(p["cdens"]),
-                                  "sparse_ratio": _r(p["sparse_ratio"])}
+                                  "sparse_ratio": _r(p["sparse_ratio"]), "sparse_ratio_res": _r(p["sparse_ratio_res"])}
                                  for p in z["per_year"]],
                     "change": z["change"],
                     "conn": ([_conn_payload(c) for c in sr["zone_conn_ts"][z["zid"]]]
@@ -2493,7 +2505,7 @@ class KpiSpatialStructureIndicators(QgsProcessingAlgorithm):
             "base_year": base_year_num or None,
             "city_type": (self._CITY_TYPES[_ct] if 0 < _ct < len(self._CITY_TYPES) else None),
             "trend_type": (self._TREND_TYPES[_tt] if 0 < _tt < len(self._TREND_TYPES) else None),
-            "dens_ref": _dr if (_dr and _dr > 0) else 2000.0,
+            "dens_ref": _dr if (_dr and _dr > 0) else 340.0,
         }
 
         dashboard = {
@@ -2952,6 +2964,7 @@ _HTML_TEMPLATE = r"""<!DOCTYPE html>
   .ovbar{display:flex;flex-wrap:wrap;gap:6px 14px;align-items:center;font-size:13px;color:var(--muted);background:#fff;border:1px solid var(--border);border-radius:8px;padding:7px 12px;margin:10px 0;}
   .ovbar select{background:#fff;color:var(--text);border:1px solid var(--border);border-radius:6px;padding:3px 8px;font-size:13px;font-family:inherit;}
   .ovbar b{color:var(--text);}
+  .ovbar input.ovdin{width:84px;margin-left:6px;background:#fff;color:var(--text);border:1px solid var(--border);border-radius:6px;padding:3px 8px;font-size:13px;font-family:inherit;}
   .ovsleg{display:flex;flex-wrap:wrap;gap:4px 12px;font-size:11.5px;color:var(--muted);margin-top:4px;}
   .ovsleg i{display:inline-block;width:14px;height:3px;border-radius:2px;margin-right:4px;vertical-align:3px;}
   h2.ovdetail{font-size:15px;color:var(--muted);border-left:none;padding-left:0;margin:30px 0 0;padding-top:14px;border-top:1px solid var(--border);}
@@ -3063,18 +3076,18 @@ _HTML_TEMPLATE = r"""<!DOCTYPE html>
     <div class="ovfac" id="ovFacWrap" style="display:none">서비스권 향유도·관리 대상 표시 시설 — 근린 <select id="ovFacN"></select> 거점 <select id="ovFacH"></select></div>
     <div class="ovtiles" id="ovTiles"></div>
     <div class="ovcap" id="ovT9cap"></div>
-    <div class="ovbar" data-ov="spbtnh"></div>
+    <div class="ovbar" data-ov="spbtnhd"></div>
     <div class="ovtw"><table class="ovtbl" id="ovT9"></table></div>
     <div class="ovnote" id="ovT9note"></div>
     <div class="ovcap" id="ovT10cap"></div>
-    <div class="ovbar" data-ov="sbtnh"></div>
+    <div class="ovbar" data-ov="sbtnhd"></div>
     <div class="ovtw"><table class="ovtbl" id="ovT10"></table></div>
     <div class="ovnote" id="ovT10note"></div>
   </div>
 
   <!-- ================= 계획권역 ================= -->
   <div class="panel" id="panel-summary">
-    <div class="ovbar" data-ov="spbtnh"></div>
+    <div class="ovbar" data-ov="spbtnhd"></div>
     <div id="ovReg"></div>
     <h2 class="ovdetail">상세 분석</h2>
     <div class="subtabs">
@@ -3177,7 +3190,7 @@ _HTML_TEMPLATE = r"""<!DOCTYPE html>
   <!-- ================= 생활권별 ================= -->
   <div class="panel" id="panel-zones">
     <div id="ovZone">
-      <div class="ovbar" data-ov="sbtnh"></div>
+      <div class="ovbar" data-ov="sbtnhd"></div>
       <div class="ovrow"><div id="ovZoneMap"></div><div class="ovbasic" id="ovZoneQuick"></div></div>
       <div id="ovZoneSecs"></div>
     </div>
@@ -3290,7 +3303,7 @@ _HTML_TEMPLATE = r"""<!DOCTYPE html>
   <!-- ================= 중심지별 ================= -->
   <div class="panel" id="panel-centers">
     <div id="ovCtr">
-      <div class="ovbar" data-ov="sbt"></div>
+      <div class="ovbar" data-ov="sbtd"></div>
       <div class="ovrow"><div id="ovCtrMap"></div><div class="ovbasic" id="ovCtrCum"></div></div>
       <div id="ovCtrRef"></div>
     </div>
@@ -4421,25 +4434,38 @@ renderAll();
   const facAll=Object.keys((SC[0]&&SC[0].fac_ts_g)||{}).filter(k=>k.indexOf("t:")===0);
   const FK={ne:facAll.filter(k=>/^t:근린/.test(k)), hu:facAll.filter(k=>/^t:거점/.test(k))};
   const fnm=k=>String(k).replace(/^t:(근린|거점)_?/,"");
-  function fillFac(sel,list,prefer){
+  function fillFac(sel,list,prefer){   // prefer: 앞에서부터 이름에 들어 있는 첫 시설을 기본으로
     sel.innerHTML=""; list.forEach(k=>sel.add(new Option(fnm(k),k)));
-    const p=list.find(k=>k.indexOf(prefer)>=0); if(p) sel.value=p;
+    for(const w of prefer){ const p=list.find(k=>k.indexOf(w)>=0); if(p){ sel.value=p; break; } }
     if(!list.length){ sel.add(new Option("없음","")); sel.disabled=true; }
   }
-  fillFac(selN,FK.ne,"약국"); fillFac(selH,FK.hu,"도서관");
+  fillFac(selN,FK.ne,["의원","약국"]); fillFac(selH,FK.hu,["도서관"]);
   if(!facAll.length){ const w=$id("ovFacWrap"); if(w) w.style.display="none"; }
+  // 밀도 참고치: 340·1000·1500·실행값·직접입력 — 바꾸면 미달 중심지 수를 다시 셈
+  const selD=document.createElement("select"), d0=+M.dens_ref||340;
+  [340,1000,1500].concat([340,1000,1500].indexOf(d0)<0?[d0]:[]).forEach(v=>selD.add(new Option(N(v),String(v))));
+  selD.add(new Option("직접입력","custom")); selD.value=String(d0);
+  let dCustom=null;
+  function applyD(){ const v=selD.value==="custom"?dCustom:+selD.value;
+    if(v>0){ M.dens_ref=v; renderOV(); } else syncBars(); }
+  selD.addEventListener("change",applyD);
 
   // ---- 구역별 선택 막대: 같은 선택을 필요한 자리마다 두고 서로 연동 ----
-  const MSEL={s:[selS,"시나리오"],p:[selP,"과거 비교연도"],t:[selT,"목표연도"],n:[selN,"근린 시설"],h:[selH,"거점 시설"]};
+  const MSEL={s:[selS,"시나리오"],p:[selP,"과거 비교연도"],t:[selT,"목표연도"],n:[selN,"근린 시설"],h:[selH,"거점 시설"],d:[selD,"밀도 참고치(명/㎢)"]};
   const ovBars=Array.prototype.slice.call(document.querySelectorAll(".ovbar"));
   ovBars.forEach(b=>{ (b.dataset.ov||"").split("").forEach(k=>{
     if(k==="b"){ const sp=document.createElement("span"); sp.innerHTML='기준연도 <b>'+esc(baseLabel)+'</b>'; b.appendChild(sp); return; }
     const m=MSEL[k]; if(!m||((k==="n"||k==="h")&&!facAll.length)) return;
     const lab=document.createElement("label"); lab.textContent=m[1]+" ";
     const c=document.createElement("select"); c.dataset.k=k; lab.appendChild(c); b.appendChild(lab);
-    c.addEventListener("change",()=>{ m[0].value=c.value; m[0].dispatchEvent(new Event("change")); }); }); });
-  function syncBars(){ ovBars.forEach(b=>b.querySelectorAll("select").forEach(c=>{ const m=MSEL[c.dataset.k][0];
-    c.innerHTML=m.innerHTML; c.value=m.value; c.disabled=m.disabled; })); }
+    c.addEventListener("change",()=>{ m[0].value=c.value; m[0].dispatchEvent(new Event("change")); });
+    if(k==="d"){ const inp=document.createElement("input"); inp.type="number"; inp.min="1"; inp.step="10"; inp.className="ovdin";
+      inp.placeholder="명/㎢"; lab.appendChild(inp);
+      inp.addEventListener("change",()=>{ const v=+inp.value; if(v>0){ dCustom=v; applyD(); } }); } }); });
+  function syncBars(){ ovBars.forEach(b=>{ b.querySelectorAll("select").forEach(c=>{ const m=MSEL[c.dataset.k][0];
+    c.innerHTML=m.innerHTML; c.value=m.value; c.disabled=m.disabled; });
+    b.querySelectorAll("input.ovdin").forEach(inp=>{ inp.style.display=selD.value==="custom"?"":"none";
+      inp.value=dCustom!=null?String(dCustom):""; }); }); }
 
   function st(){
     const si=+selS.value||0, s=SC[si];
@@ -4471,7 +4497,12 @@ renderAll();
   const lvLab=l=>String(l).split("+").join(" 또는 ")+" 중심지까지";
   const EQK=0;   // ③ 접근 형평성 대표값 = 위계 누적 첫 단계(1차 중심지까지) — 성과 평가 지원과 같은 기준
   const facAt=(g,key,yi)=>{ const a=g&&g[key]; return a&&a[yi]?a[yi]:null; };
-  function missCnt(s,yi,tier,zname){ const ref=M.dens_ref||2000;
+  // 개수 표기는 '해당/전체' — 전체 = 그 위계(생활권)의 중심지 수 · 그 유형의 시설 수
+  function ctrCnt(s,tier,zname){ return (s.centers||[]).filter(c=>c.tier===tier&&(zname==null||c.zone===zname)).length; }
+  const ofN=(a,n)=>N(a)+"/"+N(n);
+  // 인구과소지역 비율 — 분모 두 가지: 전체 격자 / 거주 격자(주거인구 > 0)
+  const SPK=[["sparse_ratio","전체 격자 기준"],["sparse_ratio_res","거주 격자 기준"]];
+  function missCnt(s,yi,tier,zname){ const ref=M.dens_ref||340;
     return (s.centers||[]).filter(c=>c.tier===tier&&(zname==null||c.zone===zname))
       .filter(c=>{ const d=(c.per_year[yi]||{}).rdens; return !nz(d)&&d<ref; }).length; }
   function refRows(kind){ const out=[];
@@ -4576,7 +4607,7 @@ renderAll();
     const fr=[];
     [[x.fn,"근린"],[x.fh,"거점"]].forEach(a=>{ if(!a[0]) return; const p=facAt(s.fac_ts_g,a[0],0), q=facAt(s.fac_ts_g,a[0],x.ti);
       fr.push([esc(fnm(a[0]))+" ("+a[1]+")", p?PCT(p.cover)+((q&&x.ti>0)?" → "+PCT(q.cover)+arrow(p.cover,q.cover):""):"–"]); });
-    if(s.fac_ts&&s.fac_ts.length) fr.push(["폐점 예상 시설 (전체)", N(s.fac_ts[0].mgmt)+((x.ti>0&&s.fac_ts[x.ti])?" → "+N(s.fac_ts[x.ti].mgmt):"")+"곳"]);
+    if(s.fac_ts&&s.fac_ts.length) fr.push(["폐점 예상 시설 (전체)", ofN(s.fac_ts[0].mgmt,s.fac_ts[0].total)+((x.ti>0&&s.fac_ts[x.ti])?" → "+ofN(s.fac_ts[x.ti].mgmt,s.fac_ts[x.ti].total):"")+"곳"]);
     h+=tile("ov-life","생활편리성","④ 서비스권 향유도",undefined,fr.length?fr:[["시설","근린·거점 시설 입력 시"]]);
     $id("ovTiles").innerHTML=h;
   }
@@ -4598,6 +4629,9 @@ renderAll();
       R.push(tr([i===0?head("① 중심지<br>주거인구 비율",cB.length):"",td(c.lab+" 중심지 집합"),td(PCT(pv)),td(PCT(c.v)),
         td(nz(cT[i].v)?"–":"("+PCT(cT[i].v)+")"),td(chg(pv,c.v,x.yp,x.yb,"pp")),td(chg(c.v,cT[i].v,x.yb,x.yt,"pp")),
         td(last&&rR.length?rR.join("<br>"):"–")])); });
+    SPK.forEach((k,i)=>{ const b=s.region_ts[0][k[0]], t=s.region_ts[ti][k[0]];
+      R.push(tr([i===0?head("[참고] 인구과소지역 비율<br>(주거밀도 "+N(D.sparse_threshold)+"명/㎢ 이하)",SPK.length):"",td(k[1]),td("–"),td(PCT(b)),
+        td(ti>0&&!nz(t)?PCT(t):"–"),td("–"),td(chg(b,t,x.yb,x.yt,"pp")),td("–")])); });
     const wf=wShareFn(s), wB=cumList(s,0,wf), wT=cumList(s,ti,wf), rW=refRows("w");
     wB.forEach((c,i)=>{ const last=i===wB.length-1;
       R.push(tr([i===0?head("② 중심지<br>근무인구 비율",wB.length):"",td(c.lab+" 중심지 집합"),td("–"),td(PCT(c.v)),
@@ -4616,20 +4650,20 @@ renderAll();
     T.forEach((t,i)=>{ const a=(t.per_year[0]||{}).rdens, b=(t.per_year[ti]||{}).rdens;
       R.push(tr([i===0?head("[참고] 중심지<br>주거인구 밀도 (명/㎢)",T.length):"",td(t.tier+"차 중심지 (평균)"),td("–"),td(N(a)),td(N(b)),
         td("–"),td(chg(a,b,x.yb,x.yt,"pct")),td("–")])); });
-    const sub=T.filter(t=>t.tier>1);
-    if(sub.length){ const f=yi=>sub.map(t=>missCnt(s,yi,t.tier)+"곳").join(" / ");
-      R.push(tr([td("└ 밀도 참고치 미달 중심지 수","l"),td(sub.map(t=>t.tier+"차").join(" / ")),td("–"),td(f(0)),td(f(ti)),
-        td("–"),td("–"),td(N(M.dens_ref||2000)+"명/㎢")])); }
+    T.forEach((t,i)=>{ const n=ctrCnt(s,t.tier);
+      R.push(tr([i===0?head("└ 밀도 참고치<br>미달 중심지 수",T.length):"",td(t.tier+"차 중심지"),td("–"),
+        td(ofN(missCnt(s,0,t.tier),n)+"곳"),td(ofN(missCnt(s,ti,t.tier),n)+"곳"),td("–"),td("–"),
+        td(i===T.length-1?N(M.dens_ref||340)+"명/㎢":"–")])); });
     T.forEach((t,i)=>{ const a=(t.per_year[0]||{}).wdens, b=(t.per_year[ti]||{}).wdens;
       R.push(tr([i===0?head("[참고] 중심지<br>근무인구 밀도 (명/㎢)",T.length):"",td(t.tier+"차 중심지 (평균)"),td("–"),td(N(a)),td(N(b)),
         td("–"),td(chg(a,b,x.yb,x.yt,"pct")),td("–")])); });
     if(fk.length) fk.forEach((a,i)=>{ const p=facAt(s.fac_ts_g,a[0],0), q=facAt(s.fac_ts_g,a[0],ti);
       R.push(tr([i===0?head("[참고] 관리 대상<br>(폐점 예상) 시설 수",fk.length):"",td(esc(fnm(a[0]))+" ("+a[1]+")"),td("–"),
-        td(p?N(p.mgmt)+"곳":"–"),td(q?N(q.mgmt)+"곳":"–"),td("–"),td("–"),td("–")])); });
+        td(p?ofN(p.mgmt,p.total)+"곳":"–"),td(q?ofN(q.mgmt,q.total)+"곳":"–"),td("–"),td("–"),td("–")])); });
     $id("ovT9").innerHTML=H+R.join("");
     $id("ovT9note").innerHTML="주1) 괄호 안 값은 격자별 인구 비율·중심지 경계·도로망을 기준연도로 고정한 장래 산출값<br>"+
       "주2) 과거 연도는 내장 SGIS 인구총조사 격자, 기준연도는 입력 격자 기준으로 자료원이 다를 수 있음 · 근무인구와 접근 형평성은 과거 자료가 없어 기준연도부터 산출<br>"+
-      "주3) 참조값은 가이드라인 표7·표8 중위값(2023년) · 밀도 참고치 "+N(M.dens_ref||2000)+"명/㎢";
+      "주3) 참조값은 가이드라인 표7·표8 중위값(2023년) · 밀도 참고치 "+N(M.dens_ref||340)+"명/㎢";
   }
   function renderT10(x){
     const s=x.s, ti=x.ti, Z=s.zones||[], R=[];
@@ -4640,6 +4674,8 @@ renderAll();
     const yr=esc(x.lb)+(ti>0?" → "+esc(x.lt):"");
     R.push('<tr><td class="l" colspan="2">[참고] 총인구 ('+yr+')</td>'+cells(z=>ar(z.per_year[0].pop,(z.per_year[ti]||{}).pop,v=>N(v)),()=>ar(s.region_ts[0].pop,s.region_ts[ti].pop,v=>N(v)))+'</tr>');
     R.push('<tr><td class="l" colspan="2">① 중심지 주거인구 비율 ('+yr+')</td>'+cells(z=>ar(z.per_year[0].crconc,(z.per_year[ti]||{}).crconc,PCT),()=>ar(s.center_ts[0].rconc,s.center_ts[ti].rconc,PCT))+'</tr>');
+    SPK.forEach((k,i)=>R.push('<tr>'+(i===0?'<td class="l" rowspan="'+SPK.length+'">[참고] 인구과소지역 비율<br>('+yr+')</td>':'')+'<td>'+k[1]+'</td>'+
+      cells(z=>ar(z.per_year[0][k[0]],(z.per_year[ti]||{})[k[0]],PCT),()=>ar(s.region_ts[0][k[0]],s.region_ts[ti][k[0]],PCT))+'</tr>'));
     R.push('<tr><td class="l" colspan="2">② 중심지 근무인구 비율 ('+yr+')</td>'+cells(z=>ar(z.per_year[0].cwconc,(z.per_year[ti]||{}).cwconc,PCT),()=>ar(s.center_ts[0].wconc,s.center_ts[ti].wconc,PCT))+'</tr>');
     const eR=eqAt(s.conn_ts,0);
     R.push('<tr><td class="l" colspan="2">③ 중심지 접근 형평성 ('+(eR?esc(lvLab(eR.levels[EQK]))+' ':'')+(eR?eR.thr:30)+'분 내, '+yr+')</td>'+
@@ -4651,16 +4687,20 @@ renderAll();
       cells(z=>{ const p=facAt(z.fac_g,a[0],0), q=facAt(z.fac_g,a[0],ti); return p?ar(p.cover,q&&q.cover,v=>N(v,1)+"%"):"–"; },
             ()=>{ const p=facAt(s.fac_ts_g,a[0],0), q=facAt(s.fac_ts_g,a[0],ti); return p?ar(p.cover,q&&q.cover,v=>N(v,1)+"%"):"–"; })+'</tr>'); });
     R.push('<tr><td class="l" colspan="2">[참고] 중심지 주거인구 밀도 (명/㎢, '+yr+')</td>'+cells(z=>ar(z.per_year[0].cdens,(z.per_year[ti]||{}).cdens,v=>N(v)),()=>ar(s.center_ts[0].density,s.center_ts[ti].density,v=>N(v)))+'</tr>');
-    const allT=tiersOf(s).map(t=>t.tier), miss=(yi,zn)=>allT.reduce((a,t)=>a+missCnt(s,yi,t,zn),0);
-    R.push('<tr><td class="l" colspan="2">└ 밀도 참고치 미달 중심지 수 ('+yr+')</td>'+cells(z=>miss(0,z.name)+(ti>0?" → "+miss(ti,z.name):"")+"곳",()=>miss(0,null)+(ti>0?" → "+miss(ti,null):"")+"곳")+'</tr>');
+    const allT=tiersOf(s).map(t=>t.tier), mz=(t,zn)=>{ const n=ctrCnt(s,t,zn);
+      return n?ofN(missCnt(s,0,t,zn),n)+(ti>0?" → "+ofN(missCnt(s,ti,t,zn),n):"")+"곳":"–"; };
+    allT.forEach((t,i)=>R.push('<tr>'+(i===0?'<td class="l" rowspan="'+allT.length+'">└ 밀도 참고치 미달 중심지 수<br>('+yr+')</td>':'')+'<td>'+t+'차 중심지</td>'+
+      cells(z=>mz(t,z.name),()=>mz(t,null))+'</tr>'));
     const zwd=(zn,yi)=>{ let a=0,w=0; (s.centers||[]).forEach(c=>{ if(zn!=null&&c.zone!==zn) return; const p=c.per_year[yi]||{};
       if(!nz(p.wdens)&&c.area>0){ w+=p.wdens*c.area; a+=c.area; } }); return a>0?w/a:null; };
     const wFut=ti>0&&!nz(zwd(null,ti));   // 장래 근무인구가 있으면 기준 → 목표연도
     R.push('<tr><td class="l" colspan="2">[참고] 중심지 근무인구 밀도 (명/㎢, '+(wFut?yr:esc(x.lb))+')</td>'+
       cells(z=>wFut?ar(zwd(z.name,0),zwd(z.name,ti),v=>N(v)):N(zwd(z.name,0)),
             ()=>wFut?ar(zwd(null,0),zwd(null,ti),v=>N(v)):N(zwd(null,0)))+'</tr>');
-    fk.forEach((a,i)=>{ R.push('<tr>'+(i===0?'<td class="l" rowspan="'+fk.length+'">[참고] 관리 대상<br>(폐점 예상) 시설 수 ('+esc(x.lt)+')</td>':'')+'<td>'+esc(fnm(a[0]))+'</td>'+
-      cells(z=>{ const q=facAt(z.fac_g,a[0],ti); return q?N(q.mgmt)+"곳":"–"; },()=>{ const q=facAt(s.fac_ts_g,a[0],ti); return q?N(q.mgmt)+"곳":"–"; })+'</tr>'); });
+    const mg=(g,key)=>{ const p=facAt(g,key,0), q=facAt(g,key,ti); if(!p) return "–";
+      return ofN(p.mgmt,p.total)+((ti>0&&q)?" → "+ofN(q.mgmt,q.total):"")+"곳"; };
+    fk.forEach((a,i)=>{ R.push('<tr>'+(i===0?'<td class="l" rowspan="'+fk.length+'">[참고] 관리 대상<br>(폐점 예상) 시설 수 ('+yr+')</td>':'')+'<td>'+esc(fnm(a[0]))+'</td>'+
+      cells(z=>mg(z.fac_g,a[0]),()=>mg(s.fac_ts_g,a[0]))+'</tr>'); });
     $id("ovT10").innerHTML=H+R.join("");
     $id("ovT10note").textContent="생활권 명칭은 ⑤ 상위생활권 도출의 명칭 설정을 따름 · 생활권별 값도 기준연도 경계·도로망 고정 가정";
   }
@@ -4739,7 +4779,7 @@ renderAll();
       right(hasPast?P.conc.slice(p0):[c0.rconc],pl,scs((q,i)=>q.center_ts[i].rconc),
         "증가는 중심지로의 인구 집중을, 감소는 인구 분산을 뜻합니다. 총인구가 감소하는 지역에서는 주변부가 더 빨리 감소해 비율이 오를 수 있으므로 중심지 인구 수와 밀도를 함께 봅니다."),
       '관련 참고지표 — 중심지 주거인구 밀도 '+N(c0.density)+(fut?' → '+N(ct.density):'')+'명/㎢'+((P&&x.pi>=0&&P.center_dens)?' ('+esc(x.lp)+': '+N(P.center_dens[x.pi])+'명/㎢)':'')+
-      (sub.length?' · 밀도 참고치 미달 중심지 '+sub.map(t=>t.tier+'차 '+missCnt(s,0,t.tier)+(fut?' → '+missCnt(s,ti,t.tier):'')+'곳').join(' / '):''));
+      (sub.length?' · 밀도 참고치 미달 중심지 '+sub.map(t=>t.tier+'차 '+ofN(missCnt(s,0,t.tier),ctrCnt(s,t.tier))+(fut?' → '+ofN(missCnt(s,ti,t.tier),ctrCnt(s,t.tier)):'')+'곳').join(' / '):''));
     // ② 중심지 근무인구 비율
     h+=card("ov-cmp","② 중심지 근무인구 비율","콤팩트성 · 핵심지표",
       left("권역 근무인구 중 1·2·3차 중심지(중심부)에서 근무하는 인구 비율<br>= 중심부 근무인구 ÷ 권역 근무인구 × 100",c0.wconc,ct.wconc,null,refRows("w"),refMain("w")),
@@ -4765,7 +4805,7 @@ renderAll();
     if(fk.length){
       const each=fk.map(a=>{ const p=facAt(s.fac_ts_g,a[0],0), q=facAt(s.fac_ts_g,a[0],ti);
         return '<dt>'+esc(fnm(a[0]))+' ('+a[1]+')</dt><dd>'+(p?PCT(p.cover)+((q&&fut)?' → '+PCT(q.cover):''):'–')+
-          (p?' · 폐점 예상 '+N(p.mgmt)+((q&&fut)?' → '+N(q.mgmt):'')+'곳':'')+'</dd>'; }).join("");
+          (p?' · 폐점 예상 '+ofN(p.mgmt,p.total)+((q&&fut)?' → '+ofN(q.mgmt,q.total):'')+'곳':'')+'</dd>'; }).join("");
       h+=card("ov-life","④ 서비스권 향유도","생활편리성 · 핵심지표",
         left("시설 서비스권 안에 거주하는 인구 비율 — 표시값은 "+fk.map(a=>esc(fnm(a[0]))).join("·")+(fk.length>1?" 평균":""),favg(s,0),favg(s,ti),null,null,null,each)+
           '<div class="ovsmall">표시 시설은 진단 요약 탭의 선택을 따름</div>',
@@ -4789,7 +4829,7 @@ renderAll();
       '<div class="ovnote">④ 서비스권 향유도는 가이드라인 표6에서 중심부 단위가 없음</div>';
     let r='<tr><th>지표</th>'+T.map(q=>'<th>'+q.tier+'차 ('+q.count+'곳)</th>').join("")+'</tr>';
     r+='<tr><td class="l">중심지 주거인구 밀도 (명/㎢, '+esc(x.lb)+(ti>0?' → '+esc(x.lt):'')+')</td>'+T.map(q=>'<td>'+N((q.per_year[0]||{}).rdens)+(ti>0?' → '+N((q.per_year[ti]||{}).rdens):'')+'</td>').join("")+'</tr>';
-    r+='<tr><td class="l">밀도 참고치('+N(M.dens_ref||2000)+'명/㎢) 미달 중심지 ('+esc(x.lb)+(ti>0?' → '+esc(x.lt):'')+')</td>'+T.map(q=>'<td>'+missCnt(s,0,q.tier)+(ti>0?' → '+missCnt(s,ti,q.tier):'')+'곳</td>').join("")+'</tr>';
+    r+='<tr><td class="l">밀도 참고치('+N(M.dens_ref||340)+'명/㎢) 미달 중심지 ('+esc(x.lb)+(ti>0?' → '+esc(x.lt):'')+')</td>'+T.map(q=>'<td>'+ofN(missCnt(s,0,q.tier),ctrCnt(s,q.tier))+(ti>0?' → '+ofN(missCnt(s,ti,q.tier),ctrCnt(s,q.tier)):'')+'곳</td>').join("")+'</tr>';
     r+='<tr><td class="l">중심지 근무인구 밀도 (명/㎢, '+esc(x.lb)+')</td>'+T.map(q=>'<td>'+N((q.per_year[0]||{}).wdens)+'</td>').join("")+'</tr>';
     $id("ovCtrRef").innerHTML='<div class="ovcap">참고지표 — 위계별</div><div class="ovtw"><table class="ovtbl">'+r+'</table></div>';
   }
@@ -4806,7 +4846,7 @@ renderAll();
     $id("ovZoneSecs").innerHTML=Z.map((z,i)=>{
       const p0=z.per_year[0], pt=z.per_year[ti]||{}, e=eqAt(z.conn,0), et=eqAt(z.conn,ti);
       const fr=fk.map(a=>{ const p=facAt(z.fac_g,a[0],0), u=facAt(z.fac_g,a[0],ti); return [esc(fnm(a[0])), p?PCT(p.cover)+((u&&ti>0)?' → '+PCT(u.cover):''):'–']; });
-      const miss=yi=>tiersOf(s).reduce((a,t)=>a+missCnt(s,yi,t.tier,z.name),0);
+      const miss=yi=>tiersOf(s).reduce((a,t)=>a+missCnt(s,yi,t.tier,z.name),0), zt=tiersOf(s).reduce((a,t)=>a+ctrCnt(s,t.tier,z.name),0);
       return '<div class="ovzdet" id="ovz-'+z.zid+'"><div class="zh"><i style="background:'+ZPAL[i%ZPAL.length]+'"></i><b>'+esc(z.name)+'</b>'+
         '<span class="ovnote" style="margin:0 0 0 auto">총인구 '+N(p0.pop)+(ti>0?' → '+N(pt.pop):'')+' ('+yr+')</span></div><div class="zb">'+
         // 굵은 값 = 목표연도(선택 시나리오) 값, 아래 줄 = 기준연도 → 목표연도
@@ -4817,7 +4857,8 @@ renderAll();
            [(e?e.thr:30)+"분 내 도달",e?esc(lvLab(e.levels[EQK])):"OD 입력 시"]])+
         tile("ov-life","생활편리성","④ 서비스권 향유도",undefined,fr.length?fr:[["시설","시설 입력 시"]])+
         '</div><div class="ovlinks">참고지표 — 중심지 주거인구 밀도 '+N(p0.cdens)+(ti>0?' → '+N(pt.cdens):'')+'명/㎢ · 밀도 참고치 미달 중심지 '+
-        miss(0)+(ti>0?' → '+miss(ti):'')+'곳'+(fk.length?' · 폐점 예상 ('+esc(x.lt)+') '+fk.map(a=>{ const u=facAt(z.fac_g,a[0],ti); return esc(fnm(a[0]))+' '+(u?N(u.mgmt):'–')+'곳'; }).join(' / '):'')+
+        ofN(miss(0),zt)+(ti>0?' → '+ofN(miss(ti),zt):'')+'곳'+(fk.length?' · 폐점 예상 ('+yr+') '+fk.map(a=>{ const p=facAt(z.fac_g,a[0],0), u=facAt(z.fac_g,a[0],ti);
+          return esc(fnm(a[0]))+' '+(p?ofN(p.mgmt,p.total)+((ti>0&&u)?' → '+ofN(u.mgmt,u.total):''):'–')+'곳'; }).join(' / '):'')+
         '</div></div>';
     }).join("");
   }
@@ -5039,7 +5080,7 @@ renderAll();
       const ks=[$("evFN").value,$("evFH").value].filter((v,i,a)=>v&&g[v]&&g[v][0]&&a.indexOf(v)===i);
       ks.forEach(f=>out.push(fnm(f)+" "+f1(g[f][0].cover)+" → "+f1(g[f][ti].cover)+"%"));
       const cov=out.join(" · ");
-      return cov+(ks.length?"<br>폐점 예상 "+ks.map(f=>fnm(f)+" "+N0(g[f][0].mgmt)+" → "+N0(g[f][ti].mgmt)+"곳").join(" · "):""); }
+      return cov+(ks.length?"<br>폐점 예상 "+ks.map(f=>fnm(f)+" "+N0(g[f][0].mgmt)+"/"+N0(g[f][0].total)+" → "+N0(g[f][ti].mgmt)+"/"+N0(g[f][ti].total)+"곳").join(" · "):""); }
     return "";
   }
   function refText(k){ if(!REF[k]) return "–"; const o=[];

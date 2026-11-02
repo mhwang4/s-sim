@@ -3006,9 +3006,9 @@ class PopAllocDialog(QDialog):
         k['fac_neigh_dir'] = filew(mode=QgsFileWidget.GetDirectory, filt='폴더')
         k['fac_hub_dir'] = filew(mode=QgsFileWidget.GetDirectory, filt='폴더')
         k['fac_radius'] = QLineEdit('1500')       # 향유도 반경 근린(m)
-        k['fac_radius_hub'] = QLineEdit('3000')   # 향유도 반경 거점(m)
-        k['fac_minpop'] = QLineEdit('500')        # 관리대상 최소배후 근린(명)
-        k['fac_minpop_hub'] = QLineEdit('3000')   # 관리대상 최소배후 거점(명)
+        k['fac_radius_hub'] = QLineEdit('5000')   # 향유도 반경 거점(m)
+        k['fac_minpop'] = QLineEdit('1000')       # 관리대상 최소배후 근린(명)
+        k['fac_minpop_hub'] = QLineEdit('2500')   # 관리대상 최소배후 거점(명)
         for i in (1, 2, 3):
             k['base%d' % i] = filew()
             k['base%d' % i].fileChanged.connect(
@@ -3030,7 +3030,7 @@ class PopAllocDialog(QDialog):
         k['base_year'] = QLineEdit('2023')
         k['city_type'] = QComboBox(); k['city_type'].addItems(['미지정', '거점도시', '강소도시', '자립도시'])
         k['trend_type'] = QComboBox(); k['trend_type'].addItems(['미지정', '성장형', '성숙·안정형', '감소형'])
-        k['dens_ref'] = QLineEdit('2000')
+        k['dens_ref'] = QLineEdit('340')
         k['base_label1'] = QLineEdit('노후주택 비율'); k['base_unit1'] = QLineEdit('%')
         k['base_label2'] = QLineEdit('토지이용 압축도'); k['base_unit2'] = QLineEdit('지수')
         k['base_label3'] = QLineEdit('토지이용 복합도'); k['base_unit3'] = QLineEdit('지수')
@@ -3401,7 +3401,7 @@ class PopAllocDialog(QDialog):
         params['CITY_TYPE'] = k['city_type'].currentIndex()
         params['TREND_TYPE'] = k['trend_type'].currentIndex()
         try:
-            params['DENS_REF'] = float(k['dens_ref'].text().strip() or 2000)
+            params['DENS_REF'] = float(k['dens_ref'].text().strip() or 340)
         except ValueError:
             pass
 
@@ -3435,9 +3435,9 @@ class PopAllocDialog(QDialog):
                 except ValueError:
                     pass
             _numf('fac_radius', 'FAC_RADIUS', 1500)
-            _numf('fac_radius_hub', 'FAC_RADIUS_HUB', 3000)
-            _numf('fac_minpop', 'FAC_MINPOP', 500)
-            _numf('fac_minpop_hub', 'FAC_MINPOP_HUB', 3000)
+            _numf('fac_radius_hub', 'FAC_RADIUS_HUB', 5000)
+            _numf('fac_minpop', 'FAC_MINPOP', 1000)
+            _numf('fac_minpop_hub', 'FAC_MINPOP_HUB', 2500)
         if want_co2:
             co2_src = k['co2_src'].filePath().strip()
             if co2_src:

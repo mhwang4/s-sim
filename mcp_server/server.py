@@ -719,7 +719,7 @@ def run_pipeline(region: str = '', steps: list[str] | None = None, out_dir: str 
         city_type: 위계 기준 도시위상 '거점'·'강소'·'자립' (기본 '거점')
         use_work_criteria: 1·2차 위계에 근무인구 기준(표5)도 적용 (기본 True)
         fac_radius, fac_minpop, fac_radius_hub, fac_minpop_hub: KPI 시설 기준(생략하면 플러그인 기본값
-            근린 1500m·500명, 거점 3000m·3000명)
+            근린 1500m·1000명, 거점 5000m·2500명)
         dedup_by_emd: 중심지 읍면동별 중복 제거 — 읍면동마다 주거인구 최대 1개 유지 (기본 True,
             중심지 후보 추출·장래 중심지 식별 공통)
         min_center_dist: 중심지 간 최소 거리(m, 폴리곤 경계 간 직선거리). 주거인구 큰 순으로 남기고
@@ -762,8 +762,8 @@ def run_kpi(region: str = '', scope: str = 'all', out_dir: str = '',
         region: 지역명(비우면 데이터팩 지역이 하나일 때 그 지역)
         scope: 'all'(일괄 산출, 기본) 또는 'basic'·'compact'·'network'·'life'(단계 산출)
         out_dir: 결과 저장 폴더(그 아래 S-Sim_분석결과(지역명)\\). 비우면 기본 위치
-        fac_radius, fac_minpop: 근린시설 서비스권 반경(m)·관리대상 최소 배후인구(명) — 생략 시 1500·500
-        fac_radius_hub, fac_minpop_hub: 거점시설 반경(m)·최소 배후인구(명) — 생략 시 3000·3000
+        fac_radius, fac_minpop: 근린시설 서비스권 반경(m)·관리대상 최소 배후인구(명) — 생략 시 1500·1000
+        fac_radius_hub, fac_minpop_hub: 거점시설 반경(m)·최소 배후인구(명) — 생략 시 5000·2500
             (이 기본값은 예시 산출용으로 근거 확정 전. 1차년도 보고서는 5000·10000. guide('kpi') 참조)
     """
     if scope not in ('all', 'basic', 'compact', 'network', 'life'):
