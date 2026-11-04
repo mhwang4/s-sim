@@ -4,6 +4,7 @@ from qgis.core import QgsApplication, QgsProcessingProvider
 from PyQt5.QtGui import QIcon
 
 from .alg_bau_allocate import BauAllocateAlgorithm
+from .alg_cohort_allocate import CohortAllocateAlgorithm, CohortWorkAllocateAlgorithm
 from .alg_center_identify import CenterIdentifyAlgorithm
 from .alg_hub_allocate import HubAllocateAlgorithm
 from .alg_plan_allocate import PlanAllocateAlgorithm
@@ -47,6 +48,8 @@ class PopAllocProvider(QgsProcessingProvider):
     def loadAlgorithms(self) -> None:
         self.addAlgorithm(PolicyAreaAlgorithm())
         self.addAlgorithm(BauAllocateAlgorithm())
+        self.addAlgorithm(CohortAllocateAlgorithm())
+        self.addAlgorithm(CohortWorkAllocateAlgorithm())
         self.addAlgorithm(HubAllocateAlgorithm())
         self.addAlgorithm(PlanAllocateAlgorithm())
         self.addAlgorithm(CenterIdentifyAlgorithm())

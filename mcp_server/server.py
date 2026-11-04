@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""KRIHS S-Sim MCP 서버 — 헤드리스 QGIS로 S-Sim 플러그인 알고리즘 17종과 지역·KPI·가이드 기능을 노출.
+"""KRIHS S-Sim MCP 서버 — 헤드리스 QGIS로 S-Sim 플러그인 알고리즘 19종과 지역·KPI·가이드 기능을 노출.
 
 실행(수동 시험):
     run_server.bat --selftest
@@ -505,7 +505,7 @@ def list_regions(region: str = '') -> list[dict]:
 
 @_tool(qgis=True)
 def list_algorithms() -> list[dict]:
-    """S-Sim 알고리즘 17종 목록 (id, 이름, 그룹).
+    """S-Sim 알고리즘 19종 목록 (id, 이름, 그룹).
 
     실행 절차: list_algorithms → describe_algorithm(id) 로 파라미터 확인
     → run_algorithm(id, params) 로 실행. 플러그인 흐름 전체는 run_pipeline, KPI 는 run_kpi 가
@@ -543,7 +543,7 @@ def describe_algorithm(alg_id: str) -> dict:
 
 @_tool(qgis=True)
 def run_algorithm(alg_id: str, params: dict, ctx: Context | None = None) -> dict:
-    """알고리즘 실행 (17종 전부). describe_algorithm 으로 파라미터 확인 후 호출.
+    """알고리즘 실행 (19종 전부). describe_algorithm 으로 파라미터 확인 후 호출.
 
     입력 파일이 없거나 좌표계가 잘못됐으면 실행 전에 안내 메시지로 알려준다.
     실행 중 진행률을 보고하고, 결과에는 출력 파일별 피처 수·필드 요약이 붙는다.
@@ -609,7 +609,7 @@ import uuid  # noqa: E402
 
 RUNNER = os.path.join(SERVER_DIR, 'pipeline_runner.py')
 _STEPS = ['population', 'future_centers', 'centers_zones', 'kpi', 'viz']
-_STEP_LABEL = {'population': '장래인구 격자 배분(거주 BAU·거점유도·계획인구, 근무 추계·BAU·계획반영)',
+_STEP_LABEL = {'population': '장래인구 격자 배분(거주 BAU·코호트·거점유도·계획인구, 근무 추계·BAU·코호트·계획반영)',
                'future_centers': '장래 중심지 식별',
                'centers_zones': '중심지 및 생활권 분석 ①~⑤',
                'kpi': 'KPI 지표 계산(일괄 산출 + 종합 리포트)',
@@ -698,12 +698,15 @@ def run_pipeline(region: str = '', steps: list[str] | None = None, out_dir: str 
                  min_density: int = 150, city_type: str = '거점', use_work_criteria: bool = True,
                  fac_radius: float | None = None, fac_minpop: float | None = None,
                  fac_radius_hub: float | None = None, fac_minpop_hub: float | None = None,
-                 dedup_by_emd: bool = True, min_center_dist: float = 1500) -> dict:
+                 dedup_by_emd: bool = True, min_center_dist: float = 1500,
+                 nondev_mode: int = 1, bau_res: str = '', bau_work: str = '',
+                 plan_table: str | None = None, work_total_adj: bool = True,
+                 cohort: bool = True, half_life: float = 5.0) -> dict:
     """플러그인 전체 흐름을 메뉴 순서 그대로 실행 (백그라운드 작업). 플러그인 화면에서 버튼을 차례로
     누른 것과 같은 결과·결과 폴더를 만든다. 바로 job_id 를 돌려주므로 job_status 로 진행을 확인한다.
 
     steps (생략하면 전체, 실행 순서는 항상 아래 순서):
-      'population'     장래인구 격자 배분 — 거주 BAU·정책관심구역·거점유도·계획인구, 근무 추계·BAU·계획반영,
+      'population'     장래인구 격자 배분 — 거주 BAU·코호트·정책관심구역·거점유도·계획인구, 근무 추계·BAU·코호트·계획반영,
                        KPI 장래 전망용 시나리오별 장래인구 파일 (약 2분)
       'future_centers' 장래 중심지 식별 (약 1분)
       'centers_zones'  중심지 및 생활권 분석 ①~⑤ — 후보 추출·속성·위계(표4·표5 기준), 중심점,
@@ -725,6 +728,13 @@ def run_pipeline(region: str = '', steps: list[str] | None = None, out_dir: str 
         min_center_dist: 중심지 간 최소 거리(m, 폴리곤 경계 간 직선거리). 주거인구 큰 순으로 남기고
             남긴 중심지와 이 거리 미만인 중심지는 상위 중심지의 영향권으로 보고 제거. 0이면 적용 안 함
             (기본 1500, 중심지 후보 추출·장래 중심지 식별 공통)
+        nondev_mode: 계획인구 반영 배분의 비개발 배분 기준. 1 = 그해 BAU 격자 비중(입주 인구는 따로 유지, 기본),
+            0 = 직전 시점 격자 비중 연쇄
+        bau_res, bau_work: 비개발 비중으로 쓸 거주·근무 BAU 배분 결과(비우면 코호트 배분 결과, 없으면 BAU 격자 배분 결과)
+        plan_table: 시나리오 거주 총량 표(생략하면 데이터팩 resid_proj_plan, ''이면 공통 추계 테이블)
+        work_total_adj: 근무 총량을 거주 시나리오 총량 비율만큼 조정 (기본 True)
+        cohort: 코호트 변화율 배분(거주)과 코호트 연동 배분(근무)을 BAU 옆 시나리오로 실행 (기본 True)
+        half_life: 코호트 배분의 반감기(년, 기본 5) — 단위 고유 변화율이 시군구 평균 쪽으로 절반 줄어드는 기간
     """
     bad = [s for s in (steps or []) if s not in _STEPS]
     if bad:
@@ -734,11 +744,16 @@ def run_pipeline(region: str = '', steps: list[str] | None = None, out_dir: str 
         raise ValueError("city_type 은 '거점'·'강소'·'자립' 중 하나")
     if int(min_density) not in (100, 150, 200, 300):
         raise ValueError('min_density 는 100·150·200·300 중 하나')
+    if int(nondev_mode) not in (0, 1):
+        raise ValueError('nondev_mode 는 0(직전 시점 연쇄)·1(BAU 격자 비중) 중 하나')
     cfg = _job_config(region, out_dir, steps, min_density=int(min_density), city_type=city_type,
                       use_work_criteria=bool(use_work_criteria), kpi_scope='all',
                       fac_radius=fac_radius, fac_minpop=fac_minpop,
                       fac_radius_hub=fac_radius_hub, fac_minpop_hub=fac_minpop_hub,
-                      dedup_by_emd=bool(dedup_by_emd), min_center_dist=float(min_center_dist or 0))
+                      dedup_by_emd=bool(dedup_by_emd), min_center_dist=float(min_center_dist or 0),
+                      nondev_mode=int(nondev_mode), bau_res=bau_res or None, bau_work=bau_work or None,
+                      plan_table=plan_table, work_total_adj=bool(work_total_adj),
+                      cohort=bool(cohort), half_life=float(half_life))
     job = _start_job('pipeline', cfg)
     return {'job_id': job['id'], 'region': cfg['region'], 'steps': [_STEP_LABEL[s] for s in steps],
             'result_root': _result_root(cfg['region'], cfg['out_dir']),
@@ -850,7 +865,7 @@ def _selftest(full=False):
     print('env:', env['qgis_version'], '| plugin', env['plugin']['version'], env['plugin']['path'],
           '| algorithms', env['algorithms'], '| regions', env['regions'], '| mcp', env['mcp_package'][:30],
           file=sys.stderr)
-    assert env['algorithms'] == 17, f"알고리즘 수 {env['algorithms']}"
+    assert env['algorithms'] == 19, f"알고리즘 수 {env['algorithms']}"
     assert env['regions'], '데이터팩 지역 없음'
     regs = list_regions()
     r0 = regs[0]
@@ -858,7 +873,7 @@ def _selftest(full=False):
     print('region:', r0['name'], '| 입력', len(r0['inputs']), '개, 없음', miss,
           '| 결과', {k: v['exists'] for k, v in r0['results'].items()}, file=sys.stderr)
     algs = list_algorithms()
-    assert len(algs) == 17
+    assert len(algs) == 19
     d = describe_algorithm('extract_candidates')
     assert d['parameters'], '파라미터 명세 비어 있음'
     g = guide()

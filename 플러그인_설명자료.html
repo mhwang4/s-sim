@@ -202,11 +202,11 @@ main section.sec .wrap{width:auto;margin:0}
 <header class="hero"><div class="wrap">
   <span class="eyebrow">QGIS 플러그인 설명자료 · 2026</span>
   <h1>공간구조 시뮬레이션 분석도구 S-Sim</h1>
-  <p class="lead" style="margin-bottom:2px;font-size:15px;color:#8a93a3">Spatial Structure Simulation Analysis Tool · v1.0.4</p>
+  <p class="lead" style="margin-bottom:2px;font-size:15px;color:#8a93a3">Spatial Structure Simulation Analysis Tool · v1.0.5</p>
   <div class="flows">
     <div class="flow">
       <span class="s">분석 지역 설정</span><span class="a">→</span>
-      <span class="s">1km 격자 배분<br><small>BAU · 거점유도 · 계획인구</small></span><span class="a">→</span>
+      <span class="s">1km 격자 배분<br><small>BAU · 코호트 · 거점유도 · 계획인구</small></span><span class="a">→</span>
       <span class="s">장래 중심지 식별</span>
     </div>
     <div class="flow">
@@ -220,7 +220,7 @@ main section.sec .wrap{width:auto;margin:0}
   </div>
   <div class="grid g5">
     <div class="box"><h4>분석 지역 설정</h4><p>지역 선택 → 입력 자동 연결</p></div>
-    <div class="box"><h4>인구 배분 · 장래 중심지</h4><p>3시나리오 → 연도별 중심지</p></div>
+    <div class="box"><h4>인구 배분 · 장래 중심지</h4><p>4시나리오 → 연도별 중심지</p></div>
     <div class="box"><h4>중심지-생활권 분석</h4><p>위계 → OD → 생활권 경계</p></div>
     <div class="box"><h4>KPI · 종합 리포트</h4><p>4개 지표군 → 진단 대시보드</p></div>
     <div class="box"><h4>MCP 서버</h4><p>Claude 대화로 분석 실행</p></div>
@@ -366,33 +366,57 @@ main section.sec .wrap{width:auto;margin:0}
 
 <section class="sec" id="sec-bau" data-tab="① BAU 배분"><div class="wrap">
   <span class="eyebrow">거주인구 배분 ①</span>
-  <h2>BAU 배분 - 현상 유지 시나리오</h2>
+  <h2>BAU 배분 · 코호트 변화율 배분 - 현상 유지 시나리오</h2>
   <div class="ipo">
-    <div class="b in"><h5>INPUT</h5><span class="nb">공통 데이터의 격자 +</span> <span class="nb">추계 테이블</span> <span class="nb">(추가 입력 없음)</span></div><div class="ar">→</div>
-    <div class="b alg"><h5>알고리즘</h5><span class="nb">pop(g,y) =</span> <span class="nb">P(s,y) × w(g)/Σw ·</span> <span class="nb">w =</span> <span class="nb">기준연도 격자인구</span> <span class="nb">(분포 고정)</span></div><div class="ar">→</div>
-    <div class="b out"><h5>OUTPUT</h5><span class="nb">연도별 배분 인구 격자 →</span> <span class="nb">연도별 지도 그룹 +</span> <span class="nb">3D 슬롯 연결</span></div>
+    <div class="b in"><h5>INPUT</h5><span class="nb">공통 데이터의 격자 +</span> <span class="nb">추계 테이블 ·</span> <span class="nb">코호트는 읍면동 경계 +</span> <span class="nb">SGIS 1km 성·연령 인구 표</span> <span class="nb">(지역 적용 시 자동 입력)</span></div><div class="ar">→</div>
+    <div class="b alg"><h5>알고리즘</h5><span class="nb">BAU:</span> <span class="nb">기준연도 격자인구 비중 고정 ·</span> <span class="nb">코호트:</span> 읍면동 단위 연령구조·과거 변화율로 감소 속도 차등</div><div class="ar">→</div>
+    <div class="b out"><h5>OUTPUT</h5><span class="nb">연도별 배분 인구 격자 →</span> <span class="nb">연도별 지도 그룹 +</span> <span class="nb">KPI 시나리오(BAU ·</span> <span class="nb">코호트)</span></div>
   </div>
   <div class="duo">
   <div class="txt">
   <ul class="keys">
     <li><span class="bdg">1</span><span class="nb"><b>결과 저장 파일</b> -</span> 비워두면 <code>거주인구 배분\거주배분_1_BAU.gpkg</code></li>
-    <li><span class="bdg">2</span><span class="nb"><b>실행</b> -</span> <span class="nb">공통 데이터만 있으면 바로.</span> <span class="nb">옆 [산식 보기]에 위 수식</span></li>
+    <li><span class="bdg">2</span><span class="nb"><b>BAU 배분 실행</b> -</span> <span class="nb">공통 데이터만 있으면 바로.</span> <span class="nb">옆 [산식 보기]에 수식</span></li>
+    <li><span class="bdg">3</span><b>읍면동 경계 · SGIS 1km 성·연령 인구 표</b> - <span class="nb">지역 적용 시 데이터팩에서 자동 입력</span></li>
+    <li><span class="bdg">4</span><span class="nb"><b>계산 기준</b> -</span> <span class="nb">반감기(기본 5년),</span> 남녀를 합쳐 계산하는 단위 인구(5,000명 미만), 맞닿은 이웃 단위와 묶어 변화율을 내는 단위 인구(1,000명 미만)</li>
+    <li><span class="bdg">5</span><span class="nb"><b>코호트 결과 저장 파일</b> -</span> 비워두면 <code>거주인구 배분\거주배분_1_코호트.gpkg</code>. 같은 폴더에 단위별 투영·격자-단위 연결 CSV가 함께 저장됨(근무 코호트 연동 배분의 입력)</li>
+    <li><span class="bdg">6</span><span class="nb"><b>코호트 변화율 배분 실행</b> -</span> <span class="nb">옆 [산식 보기]에 단계별 수식</span></li>
   </ul>
+  <div class="formula"><span class="nb">BAU:</span> <span class="nb">pop(g,y) =</span> <span class="nb">P(s,y) × w(g)/Σw ·</span> <span class="nb">w =</span> <span class="nb">기준연도 격자인구</span> <span class="nb">(분포 고정)</span>
+  <small><span class="nb">코호트 단위:</span> <span class="nb">읍·면이 있는 시군구는 읍·면 각각 +</span> <span class="nb">동 전체를 묶은 동지역 하나,</span> <span class="nb">동만 있는 시군구는 동 각각 ·</span> 단위별 코호트 변화율(2000~2020)로 5년 단계 투영 · 변화율은 반감기만큼 시군구 평균 쪽으로 수렴 · <span class="nb">시군구 합계 =</span> <span class="nb">추계 테이블 ·</span> <span class="nb">격자 =</span> 기준연도 격자인구 × 단위 배율(동만 있는 시군구는 겹친 면적 비율로 섞음)</small></div>
   <ul>
-    <li>가중치 합 0인 시군구(인구 전무)는 <b>균등 배분</b> + <span class="nb">경고.</span></li>
-    <li>지도 그룹은 연도별 레이어(0·100·200·500·1000·5000 고정 구간) - <span class="nb">마지막 연도만 켜짐.</span></li>
-    <li><span class="nb">역할:</span> "지금 많은 곳이 미래에도 많다"는 <b>관성 기준선</b> - <span class="nb">거점유도·계획인구와 비교용.</span></li>
+    <li>BAU는 "지금 많은 곳이 미래에도 많다"는 <b>관성 기준선</b> - <span class="nb">시군구 안의 격자 비율이 모든 연도에 같음.</span></li>
+    <li><span class="nb">코호트는 시군구 총량이 BAU와 같고,</span> 고령 인구가 많은 읍·면과 원도심 동이 더 빨리 줄어 <b>시군구 안 비율이 연도별로 바뀜</b> - <span class="nb">비율형 KPI(중심지 집중도,</span> <span class="nb">인구과소지역 비율 등)가 움직임.</span></li>
+    <li>과거 택지개발로 인구가 급증한 단위는 그 추세가 반감기만큼 줄어들며 이어짐.</li>
+    <li>가중치 합 0인 시군구(인구 전무)는 <b>균등 배분</b> + <span class="nb">경고.</span> 지도 그룹은 연도별 레이어(0·100·200·500·1000·5000 고정 구간) - <span class="nb">마지막 연도만 켜짐.</span></li>
   </ul>
-  <div class="specs"><div class="cap">출력 형식 (전남광주)</div>
-  <details class="spec"><summary>거주배분_1_BAU.gpkg <small><span class="nb">격자 폴리곤 ·</span> <span class="nb">원본 격자 컬럼 +</span> <span class="nb">연도별 인구</span></small></summary><div class="bd">
-    <table class="sample"><tr><td>gid</td><td>sgg_nm</td><td>pop_r</td><td>pop_2025</td><td>pop_2030</td><td>pop_2035</td><td>pop_2040</td></tr>
-    <tr><td>다라4785</td><td>동구</td><td>12204</td><td>12499.8</td><td>12641.7</td><td>12751.3</td><td>12613.8</td></tr>
-    <tr><td>다라4977</td><td>동구</td><td>1925</td><td>1971.7</td><td>1994.0</td><td>2011.3</td><td>1989.6</td></tr></table>
+  <div class="specs"><div class="cap">입력·출력 형식 (전남광주)</div>
+  <details class="spec"><summary>SGIS_성연령_1km.csv <small><span class="nb">데이터팩 03_인구추계 ·</span> <span class="nb">1행 =</span> <span class="nb">연도 × 격자</span></small></summary><div class="bd">
+    <table><tr><th>컬럼</th><th>타입</th><th>필수</th><th>설명</th></tr>
+    <tr><td>year</td><td>정수</td><td>필수</td><td class="wrap">2000·2005·2010·2015·2020</td></tr>
+    <tr><td>gid</td><td>문자</td><td>필수</td><td class="wrap"><span class="nb">격자 ID</span> (격자 파일과 같은 체계)</td></tr>
+    <tr><td>tot</td><td>숫자</td><td>필수</td><td class="wrap"><span class="nb">총인구</span></td></tr>
+    <tr><td>T00~T17 · M00~M17 · F00~F17</td><td>숫자</td><td>필수</td><td class="wrap">전체·남·여 5세 연령(0~4세 … 80~84세, <span class="nb">85세 이상)</span></td></tr></table>
+    <ul class="note"><li>통계청 SGIS 인구주택총조사 1km 격자 성·연령별 인구</li></ul>
+  </div></details>
+  <details class="spec"><summary>거주배분_1_BAU.gpkg · 거주배분_1_코호트.gpkg <small><span class="nb">격자 폴리곤 ·</span> <span class="nb">원본 격자 컬럼 +</span> <span class="nb">연도별 인구</span></small></summary><div class="bd">
+    <table class="sample"><tr><td>파일</td><td>gid</td><td>sgg_nm</td><td>pop_r</td><td>pop_2025</td><td>pop_2030</td><td>pop_2035</td><td>pop_2040</td></tr>
+    <tr><td>BAU</td><td>다라4785</td><td>동구</td><td>12204</td><td>12499.8</td><td>12641.7</td><td>12751.3</td><td>12613.8</td></tr>
+    <tr><td>BAU</td><td>다라4977</td><td>동구</td><td>1925</td><td>1971.7</td><td>1994.0</td><td>2011.3</td><td>1989.6</td></tr>
+    <tr><td>코호트</td><td>다라4785</td><td>동구</td><td>12204</td><td>12207.4</td><td>11878.4</td><td>11651.4</td><td>11266.3</td></tr>
+    <tr><td>코호트</td><td>다라4977</td><td>동구</td><td>1925</td><td>2103.9</td><td>2334.8</td><td>2507.3</td><td>2589.9</td></tr></table>
+  </div></details>
+  <details class="spec"><summary>거주코호트_단위별투영.csv <small><span class="nb">1행 =</span> <span class="nb">단위 ·</span> <span class="nb">근무 코호트 연동 배분 입력</span></small></summary><div class="bd">
+    <table class="sample"><tr><td>sgg_cd_h</td><td>unit</td><td>pop_base</td><td>pop_2040</td><td>r15_2040</td></tr>
+    <tr><td>24010</td><td>계림1동</td><td>7474.9</td><td>7385.8</td><td>1.010</td></tr>
+    <tr><td>36030</td><td>동지역</td><td>172970.0</td><td>152688.5</td><td>0.903</td></tr>
+    <tr><td>36030</td><td>별량면</td><td>5146.0</td><td>3274.6</td><td>0.635</td></tr></table>
+    <ul class="note"><li><span class="nb">r15 =</span> 기준연도 대비 단위 15세 이상 거주인구 배율. <span class="nb">격자-단위 연결 CSV는 gid ·</span> <span class="nb">unit ·</span> <span class="nb">weight(겹친 면적 비율)</span></li></ul>
   </div></details>
   </div>
   <div class="tip"><b>검증</b> 실행 후 시군구별 pop_YYYY 합계가 추계 테이블과 일치하는지 확인 - <span class="nb">모든 배분 공통.</span></div>
   </div>
-  <figure><img src="docs_img/a_BAU_거주.png" alt="BAU 배분 화면"><figcaption><span class="nb">① BAU 배분 -</span> <span class="nb">결과 저장 파일과 실행 버튼이 전부</span></figcaption></figure>
+  <figure><img src="docs_img/a_BAU_거주.png" alt="BAU 배분 화면"><figcaption><span class="nb">① BAU 배분 -</span> <span class="nb">위:</span> <span class="nb">BAU ·</span> <span class="nb">아래:</span> <span class="nb">코호트 변화율 배분</span></figcaption></figure>
   </div>
 </div></section>
 
@@ -443,8 +467,8 @@ main section.sec .wrap{width:auto;margin:0}
   <span class="eyebrow">거주인구 배분 ③</span>
   <h2>계획인구 반영 배분 - 개발·비개발 분리</h2>
   <div class="ipo">
-    <div class="b in"><h5>INPUT</h5><span class="nb">공통 데이터 +</span> <span class="nb">개발사업 지구 경계 자료</span> <span class="nb">(계획인구·준공연도 포함)</span></div><div class="ar">→</div>
-    <div class="b alg"><h5>알고리즘</h5><span class="nb">KOTI 입주율로 연도 분산 →</span> <span class="nb">개발격자 균등 +</span> <span class="nb">비개발 비례</span></div><div class="ar">→</div>
+    <div class="b in"><h5>INPUT</h5><span class="nb">공통 데이터 +</span> <span class="nb">개발사업 지구 경계 자료</span> <span class="nb">(계획인구·준공연도 포함) +</span> <span class="nb">시나리오 총량 표</span></div><div class="ar">→</div>
+    <div class="b alg"><h5>알고리즘</h5><span class="nb">KOTI 입주율로 연도 분산 →</span> <span class="nb">개발격자 균등 +</span> <span class="nb">비개발은 BAU(코호트) 격자 비중</span></div><div class="ar">→</div>
     <div class="b out"><h5>OUTPUT</h5><span class="nb">계획인구 반영 배분 격자 자료 +</span> <span class="nb">개발·비개발 분배 내역 →</span> <span class="nb">지도 그룹(사업지 경계 포함)</span></div>
   </div>
   <div class="duo">
@@ -452,12 +476,18 @@ main section.sec .wrap{width:auto;margin:0}
   <ul class="keys">
     <li><span class="bdg">1</span><span class="nb"><b>개발사업 지구 파일</b> -</span> <span class="nb"><b>1피처 = 1사업</b>.</span> <span class="nb">지역 적용 시 자동 입력</span></li>
     <li><span class="bdg">2</span><span class="nb"><b>필드 콤보</b> -</span> <span class="nb">계획인구·준공연도(필수),</span> <span class="nb">사업 전체 인구합·관할 시군구 코드(선택)</span></li>
-    <li><span class="bdg">3</span><span class="nb"><b>결과 저장 파일 · 분배 CSV</b> -</span> <span class="nb">비워두면 자동 저장</span></li>
-    <li><span class="bdg">4</span><span class="nb"><b>실행</b></span></li>
+    <li><span class="bdg">3</span><span class="nb"><b>시나리오 총량 표</b> -</span> <span class="nb">개발계획 시나리오의 시군구 총량.</span> 지역 적용 시 데이터팩 계획인구 추계(<code>거주인구_추계_시군구_계획인구.csv</code>) 자동 입력, <span class="nb">비우면 공통 추계 테이블</span></li>
+    <li><span class="bdg">4</span><span class="nb"><b>비개발 배분 기준</b> -</span> 기본 <b>BAU 격자 비중</b>(입주 인구는 따로 유지). BAU 배분 결과 칸을 비우면 코호트 배분 결과, <span class="nb">없으면 BAU 배분 결과를 씀.</span> '직전 시점 격자 비중 연쇄'도 고를 수 있음</li>
+    <li><span class="bdg">5</span><span class="nb"><b>결과 저장 파일 · 분배 CSV</b> -</span> <span class="nb">비워두면 자동 저장</span></li>
+    <li><span class="bdg">6</span><span class="nb"><b>실행</b></span></li>
   </ul>
-  <div class="formula"><span class="nb">입주율:</span> <span class="nb">10만↑ 30/20/20/20/10% ·</span> <span class="nb">5만~10만 50/20/15/15% ·</span> <span class="nb">5만 미만 75/15/10%</span>
-  <small>유입연도는 다음 목표연도로(2028→2030) · <span class="nb">개발격자 =</span> <span class="nb">경계 교차 전부,</span> <span class="nb">균등 배분 ·</span> <span class="nb">비개발 =</span> <span class="nb">총량−개발,</span> <span class="nb">직전 시점 비례 ·</span> <span class="nb">이전 개발지구는 다음 연도 거주지화</span></small></div>
-  <ul><li><span class="nb">마지막 목표연도 이후 준공 사업은 반영 불가</span> <span class="nb">(로그 경고).</span></li></ul>
+  <div class="formula"><span class="nb">비개발(s,y) =</span> <span class="nb">총량(s,y) − 개발 누적(s,y) →</span> <span class="nb">그해 BAU(코호트) 격자 비중으로 배분 ·</span> <span class="nb">격자 =</span> <span class="nb">비개발 배분 +</span> <span class="nb">개발 누적</span>
+  <small><span class="nb">입주율:</span> <span class="nb">10만↑ 30/20/20/20/10% ·</span> <span class="nb">5만~10만 50/20/15/15% ·</span> <span class="nb">5만 미만 75/15/10% ·</span> 유입연도는 다음 목표연도로(2028→2030) · <span class="nb">개발격자 =</span> <span class="nb">경계 교차 전부,</span> <span class="nb">균등 배분 ·</span> <span class="nb">개발사업이 없고 총량이 같으면 결과 =</span> <span class="nb">BAU</span></small></div>
+  <ul>
+    <li>'직전 시점 격자 비중 연쇄'를 고르면 비개발 = <span class="nb">총량 − 개발,</span> 직전 시점 비례 배분이고 이전 개발지구는 다음 연도에 거주지로 합쳐짐.</li>
+    <li>BAU 격자 비중 기준에서 분배 CSV의 개발 인구는 누적값(<code>devcum_YYYY</code>).</li>
+    <li><span class="nb">마지막 목표연도 이후 준공 사업은 반영 불가</span> <span class="nb">(로그 경고).</span></li>
+  </ul>
   <div class="specs"><div class="cap">입력 형식 (예시: 전남광주 데이터팩)</div>
   <details class="spec"><summary>개발사업 지구 경계 <small><span class="nb">폴리곤 ·</span> <span class="nb">1행 =</span> <span class="nb">1개발사업</span></small></summary><div class="bd">
     <table><tr><th>컬럼</th><th>타입</th><th>필수</th><th>설명</th></tr>
@@ -470,9 +500,14 @@ main section.sec .wrap{width:auto;margin:0}
     <tr><td>광주연구개발특구 첨단3지구</td><td>18924</td><td>2025</td><td>18924</td><td>24040</td></tr></table>
     <ul class="note"><li><span class="nb">필드명이 달라도 필드 콤보에서 선택 가능</span></li></ul>
   </div></details>
+  <details class="spec"><summary>시나리오 총량 표 <small><span class="nb">추계 테이블과 같은 형식 ·</span> <span class="nb">1행 =</span> <span class="nb">시군구</span></small></summary><div class="bd">
+    <table><tr><th>컬럼</th><th>타입</th><th>필수</th><th>설명</th></tr>
+    <tr><td>sgg_cd_h</td><td>코드</td><td>필수</td><td class="wrap"><span class="nb">시군구 코드</span></td></tr>
+    <tr><td>pop_YYYY</td><td>숫자</td><td>필수</td><td class="wrap"><span class="nb">연도별 시나리오 총량</span> <span class="nb">(예:</span> pop_2025 … pop_2040)</td></tr></table>
+  </div></details>
   </div>
   </div>
-  <figure><img src="docs_img/a_계획인구_거주.png" alt="계획인구 반영 배분 화면"><figcaption><span class="nb">③ 계획인구 반영 -</span> <span class="nb">지구 필드만 지정하면 됨</span></figcaption></figure>
+  <figure><img src="docs_img/a_계획인구_거주.png" alt="계획인구 반영 배분 화면"><figcaption><span class="nb">③ 계획인구 반영 -</span> <span class="nb">지구 필드,</span> <span class="nb">시나리오 총량 표,</span> <span class="nb">비개발 배분 기준</span></figcaption></figure>
   </div>
 </div></section>
 
@@ -543,21 +578,35 @@ main section.sec .wrap{width:auto;margin:0}
 
 <section class="sec" id="sec-work-bau" data-tab="① BAU 배분"><div class="wrap">
   <span class="eyebrow">근무인구 배분 ①</span>
-  <h2>BAU 배분 - 거주 BAU와 같은 방식</h2>
+  <h2>BAU 배분 · 코호트 연동 배분 - 거주 배분과 같은 방식</h2>
   <div class="ipo">
-    <div class="b in"><h5>INPUT</h5><span class="nb">근무 공통 데이터</span> <span class="nb">(격자 pop_w +</span> <span class="nb">근무인구 추계)</span></div><div class="ar">→</div>
-    <div class="b alg"><h5>알고리즘</h5><span class="nb">기준연도 근무인구 분포 고정,</span> <span class="nb">시군구 총량만 증감</span></div><div class="ar">→</div>
-    <div class="b out"><h5>OUTPUT</h5><span class="nb">근무 BAU 배분 격자 자료 →</span> <span class="nb">3D 슬롯 자동 연결</span></div>
+    <div class="b in"><h5>INPUT</h5><span class="nb">근무 공통 데이터</span> <span class="nb">(격자 pop_w +</span> <span class="nb">근무인구 추계) ·</span> 코호트는 거주 코호트 배분의 단위별 투영·격자-단위 연결 CSV</div><div class="ar">→</div>
+    <div class="b alg"><h5>알고리즘</h5><span class="nb">BAU:</span> <span class="nb">기준연도 근무인구 분포 고정 ·</span> <span class="nb">코호트:</span> 같은 단위의 15세 이상 거주인구 변화 배율</div><div class="ar">→</div>
+    <div class="b out"><h5>OUTPUT</h5><span class="nb">근무 배분 격자 자료 →</span> <span class="nb">BAU ·</span> 코호트 시나리오의 근무인구(pop_w)</div>
   </div>
   <div class="duo">
   <div class="txt">
   <ul class="keys">
     <li><span class="bdg">1</span><span class="nb"><b>결과 저장 파일</b> -</span> 비워두면 <code>근무인구 배분\근무배분_1_BAU.gpkg</code></li>
-    <li><span class="bdg">2</span><span class="nb"><b>실행</b></span></li>
+    <li><span class="bdg">2</span><span class="nb"><b>BAU 배분 실행</b></span></li>
+    <li><span class="bdg">3</span><span class="nb"><b>코호트 결과 저장 파일</b> -</span> 비워두면 <code>근무인구 배분\근무배분_1_코호트.gpkg</code></li>
+    <li><span class="bdg">4</span><span class="nb"><b>코호트 연동 배분 실행</b> -</span> 거주인구 배분의 코호트 변화율 배분을 먼저 실행</li>
   </ul>
-  <ul><li><span class="nb">근무인구 추계 테이블이 없으면 실행 불가 →</span> <span class="nb">장래 근무인구 추계 먼저.</span></li></ul>
+  <div class="formula"><span class="nb">단위 근무(t) =</span> 기준연도 단위 근무인구 × 단위 15세 이상 거주인구 배율(t) → <span class="nb">시군구 근무 총량에 맞춤</span>
+  <small><span class="nb">격자 근무(t) =</span> 기준연도 격자 근무인구 × 단위 근무 배율(t) · 동만 있는 시군구는 겹친 면적 비율로 섞음 · <span class="nb">근무인구 0 격자는 계속 0</span></small></div>
+  <ul>
+    <li><span class="nb">근무인구 추계 테이블이 없으면 실행 불가 →</span> <span class="nb">장래 근무인구 추계 먼저.</span></li>
+    <li>일자리가 같은 단위의 15세 이상 주민 변화를 따르므로, 단위가 작은 곳(광주·목포의 동)일수록 주민이 줄어드는 원도심의 근무인구도 함께 줄어듦.</li>
+  </ul>
+  <div class="specs"><div class="cap">출력 형식 (전남광주)</div>
+  <details class="spec"><summary>근무배분_1_코호트.gpkg <small><span class="nb">격자 폴리곤 ·</span> <span class="nb">원본 격자 컬럼 +</span> <span class="nb">연도별 근무인구</span></small></summary><div class="bd">
+    <table class="sample"><tr><td>gid</td><td>sgg_nm</td><td>pop_w</td><td>pop_2025</td><td>pop_2030</td><td>pop_2035</td><td>pop_2040</td></tr>
+    <tr><td>다라4785</td><td>동구</td><td>6432</td><td>6593.8</td><td>6868.9</td><td>7059.4</td><td>7083.3</td></tr>
+    <tr><td>다라4977</td><td>동구</td><td>174</td><td>194.4</td><td>232.8</td><td>268.7</td><td>291.4</td></tr></table>
+  </div></details>
   </div>
-  <figure><img src="docs_img/a_BAU_근무.png" alt="근무 BAU 배분 화면"><figcaption><span class="nb">근무 ① BAU 배분</span></figcaption></figure>
+  </div>
+  <figure><img src="docs_img/a_BAU_근무.png" alt="근무 BAU 배분 화면"><figcaption><span class="nb">근무 ① BAU 배분 -</span> <span class="nb">위:</span> <span class="nb">BAU ·</span> <span class="nb">아래:</span> <span class="nb">코호트 연동 배분</span></figcaption></figure>
   </div>
 </div></section>
 
@@ -566,7 +615,7 @@ main section.sec .wrap{width:auto;margin:0}
   <h2>계획인구 반영 배분 - 개발지구 근무 유입</h2>
   <div class="ipo">
     <div class="b in"><h5>INPUT</h5><span class="nb">근무 공통 데이터 +</span> <span class="nb">개발사업 지구 경계 자료</span></div><div class="ar">→</div>
-    <div class="b alg"><h5>알고리즘</h5><span class="nb">개발지구 근무 유입 =</span> <span class="nb">계획인구 × 시군 원단위,</span> <span class="nb">연도 분산</span></div><div class="ar">→</div>
+    <div class="b alg"><h5>알고리즘</h5><span class="nb">개발지구 근무 유입 =</span> <span class="nb">계획인구 × 시군 원단위,</span> <span class="nb">연도 분산 ·</span> <span class="nb">비개발은 BAU(코호트) 격자 비중</span></div><div class="ar">→</div>
     <div class="b out"><h5>OUTPUT</h5>근무 계획인구 반영 배분 격자 자료 + <span class="nb">시군별 개발·비개발 분배 CSV</span></div>
   </div>
   <div class="duo">
@@ -575,11 +624,13 @@ main section.sec .wrap{width:auto;margin:0}
     <li><span class="bdg">1</span><span class="nb"><b>개발사업 지구 파일</b> -</span> <span class="nb">거주 계획인구 반영과 같은 파일</span></li>
     <li><span class="bdg">2</span><span class="nb"><b>필드 콤보</b> -</span> <span class="nb">계획인구·준공연도(필수),</span> <span class="nb">사업 전체 인구합·관할 시군구 코드(선택)</span></li>
     <li><span class="bdg">3</span><span class="nb"><b>근무 원단위</b> -</span> <span class="nb">체크 시 개발지구 근무 유입 =</span> <span class="nb">계획인구 × 시군별</span> <span class="nb">(근무인구 합 ÷ 주거인구 합).</span> <span class="nb">분모 필드 기본값 <code>pop_r</code></span></li>
-    <li><span class="bdg">4</span><span class="nb"><b>배분 실행</b></span></li>
-    <li><span class="bdg">5</span><span class="nb"><b>개발지구 장래 근무인구 산출</b> -</span> 격자 배분 없이 개발지구 근무인구 총량만 시군·연도별 CSV로</li>
+    <li><span class="bdg">4</span><span class="nb"><b>근무 총량 조정</b> -</span> 체크 시 근무 총량 × 시나리오 거주 총량 ÷ 공통 추계 거주 총량 <span class="nb">(거주 ③의 시나리오 총량 표가 있을 때)</span></li>
+    <li><span class="bdg">5</span><span class="nb"><b>비개발 배분 기준</b> -</span> <span class="nb">거주 ③과 같음.</span> BAU 배분 결과 칸을 비우면 근무 코호트 결과, <span class="nb">없으면 근무 BAU 결과</span></li>
+    <li><span class="bdg">6</span><span class="nb"><b>배분 실행</b></span></li>
+    <li><span class="bdg">7</span><span class="nb"><b>개발지구 장래 근무인구 산출</b> -</span> 격자 배분 없이 개발지구 근무인구 총량만 시군·연도별 CSV로</li>
   </ul>
   <div class="formula"><span class="nb">개발지구 근무 유입 =</span> 연도별 입주 계획인구 × 시군 원단위(Σ근무인구 ÷ Σ주거인구)
-  <small><span class="nb">관할 시군이 없는 사업은 전체 원단위 적용</span></small></div>
+  <small>관할 시군이 없는 사업은 전체 원단위 적용 · 조정한 근무 총량은 <code>근무인구 배분\추계_근무인구_계획반영.csv</code>로 저장</small></div>
   </div>
   <figure><img src="docs_img/a_계획인구_근무.png" alt="근무 계획인구 반영 배분 화면"><figcaption><span class="nb">근무 ② 계획인구 반영 -</span> <span class="nb">위:</span> <span class="nb">격자 배분 ·</span> <span class="nb">아래:</span> <span class="nb">개발지구 근무인구 총량</span></figcaption></figure>
   </div>
@@ -1027,7 +1078,7 @@ main section.sec .wrap{width:auto;margin:0}
   <div class="txt">
   <table>
     <tr><th>요소</th><th>내용</th></tr>
-    <tr><td>선택 막대</td><td class="wrap"><span class="nb">시나리오(BAU ·</span> <span class="nb">계획반영 ·</span> <span class="nb">유도정책) ·</span> <span class="nb">과거 비교연도 ·</span> <span class="nb">목표연도 ·</span> <span class="nb">근린·거점 시설 -</span> 바꾸면 탭 안의 값과 그래프가 함께 바뀜</td></tr>
+    <tr><td>선택 막대</td><td class="wrap"><span class="nb">시나리오(BAU ·</span> <span class="nb">코호트 ·</span> <span class="nb">계획반영 ·</span> <span class="nb">유도정책) ·</span> <span class="nb">과거 비교연도 ·</span> <span class="nb">목표연도 ·</span> <span class="nb">근린·거점 시설 -</span> 바꾸면 탭 안의 값과 그래프가 함께 바뀜</td></tr>
     <tr><td>핵심지표 4종</td><td class="wrap">① 중심지 주거인구 비율 · ② 중심지 근무인구 비율 · ③ 중심지 접근 형평성 · <span class="nb">④ 서비스권 향유도</span></td></tr>
     <tr><td>상세 분석</td><td class="wrap"><span class="nb">탭 아래 지표군 버튼 -</span> <span class="nb">기초통계 ·</span> <span class="nb">콤팩트성 ·</span> <span class="nb">네트워크성 ·</span> 생활편리성 표와 추이 그래프</td></tr>
     <tr><td>지표 해설</td><td class="wrap">카드 아래 [지표 해설(가이드라인)] 버튼 - 가이드라인의 해석 기준이 펼쳐짐</td></tr>

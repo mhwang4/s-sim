@@ -298,6 +298,29 @@ def entry_schedule(plan_pop, yr_done, band_pop=None):
     return {yr_done + k: v for k, v in enumerate(base) if v > 0}
 
 
+def scale_sgg_table(base_path, numer_path, denom_path, out_path):
+    """시군구 추계 표 × 분자 표 ÷ 분모 표를 sgg_cd_h + pop_YYYY 표로 저장.
+
+    계획 시나리오의 근무 총량 = 근무 총량 × 시나리오 거주 총량 ÷ 공통 추계 거주 총량.
+    """
+    base, years, _ = load_sgg_table(base_path)
+    numer, _, _ = load_sgg_table(numer_path)
+    denom, _, _ = load_sgg_table(denom_path)
+    rows = []
+    for sgg in sorted(base):
+        row = [sgg]
+        for yr in years:
+            top, bottom = numer.get(sgg, {}).get(yr), denom.get(sgg, {}).get(yr)
+            if top is None or not bottom:
+                raise ValueError(f'총량 조정에 필요한 값이 없습니다: 시군구 {sgg} {yr}년')
+            row.append(round(base[sgg][yr] * top / bottom, 4))
+        rows.append(row)
+    with open(out_path, 'w', encoding='utf-8-sig', newline='') as f:
+        w = csv.writer(f)
+        w.writerow(['sgg_cd_h'] + [f'pop_{yr}' for yr in years])
+        w.writerows(rows)
+
+
 def target_of(year, targets):
     """연간 유입 연도 → 반영할 목표연도 (자신보다 큰 최소 목표연도).
 

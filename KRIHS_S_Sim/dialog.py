@@ -19,7 +19,7 @@ import webbrowser
 from PyQt5.QtCore import QSettings, Qt
 from PyQt5.QtWidgets import (
     QApplication, QCheckBox, QComboBox, QDialog, QDialogButtonBox,
-    QDoubleSpinBox, QFormLayout, QGroupBox, QHBoxLayout, QLabel, QLineEdit,
+    QDoubleSpinBox, QSpinBox, QFormLayout, QGroupBox, QHBoxLayout, QLabel, QLineEdit,
     QListWidget, QListWidgetItem, QMessageBox, QPlainTextEdit, QProgressBar,
     QPushButton, QScrollArea, QSplitter, QStackedWidget, QTableWidget,
     QTableWidgetItem, QVBoxLayout, QWidget,
@@ -277,6 +277,27 @@ pop(g, y) = P(s, y) × w(g) / Σ w(g′)   (g′ ∈ 시군구 s)
   P(s, y) = 시군구 s의 y년 추계 총량
 시군구 합계 = 추계 테이블 값 그대로 보존
 가중치 합 0인 시군구 → 균등 배분 + 경고'''),
+    'cohort': ('코호트 변화율 배분 — 읍면동 단위 연령구조·과거 변화율', '''\
+① 단위(그릇)
+   읍·면이 있는 시군구: 읍·면 각각 + 동 전체를 묶은 '동지역' 하나
+     격자는 겹친 면적이 가장 큰 읍면동의 단위에 속함
+   동만 있는 시군구: 동 각각 - 격자는 겹친 면적 비율로 여러 동에 연결
+② 단위별 SGIS 5세×성 인구(2000~2020) → 단위 총인구에 맞춰 비례 조정
+   CCR(a) = P(a, t+5) ÷ P(a−1, t)   (네 기간 분자 합 ÷ 분모 합)
+   CWR = 0~4세 ÷ 15~49세 여성
+   5,000명 미만 단위는 남녀 합쳐, 1,000명 미만은 맞닿은 이웃 단위와 묶어 변화율 산출
+③ 2020 → 5년 단계 투영, 변화율은 시군구 평균 쪽으로 수렴
+   w_k = 0.5^((5k + 2.5) / 반감기),  CCR_k = CCR_시군구 × (CCR_단위 ÷ CCR_시군구)^w_k
+④ 기준연도 맞추기: 단위(t) = 기준연도 격자인구 합 × 계산(t) ÷ 계산(기준연도)
+⑤ 시군구 총량: 연도마다 모든 단위에 같은 배율 → 합계 = 추계 테이블
+⑥ 격자(t) = 기준연도 격자인구 × 연결된 단위의 배율(t)'''),
+    'cohort_w': ('코호트 연동 근무 배분 — 단위 15세 이상 거주인구 변화', '''\
+단위(그릇)·격자 연결은 거주 코호트 배분과 같음
+① 15세 이상 배율(t) = 단위 최종 거주(t) × 15세 이상 비율(t) ÷ 기준연도 15세 이상
+② 단위 근무 원값(t) = 기준연도 단위 근무인구 × 15세 이상 배율(t)
+③ 시군구 배율(t) = 시군구 근무 추계(t) ÷ Σ 원값(t)  → 단위 근무(t) = 원값(t) × 배율(t)
+④ 격자(t) = 기준연도 격자 근무인구 × 연결된 단위의 근무 배율(t)
+   근무인구 0 격자는 계속 0'''),
     'hub': ('거점유도 배분 — 거점/비거점 지수모형, 연도 연쇄', '''\
 연도 오름차순으로 순차 배분. 각 연도 y에서:
   ratio(g) = 직전 시점 격자인구 / 시군구 평균  (최초는 기준연도 인구)
@@ -296,7 +317,11 @@ pop(g, y) = P(s, y) × w(g) / Σ w(g′)   (g′ ∈ 시군구 s)
 ④ 비개발 인구 = P(s,y) − 개발(s,y) 를 직전 시점 격자인구 비율 기반 비례 배분
 ⑤ ③+④ 합산 결과가 다음 목표연도의 배분 가중치로 연쇄 적용
    (이전 연도 개발지구는 거주지화되어 비개발 배분에 포함)
-[근무 원단위] 개발 유입 = 계획인구 × 시군별 근무인구 합계/주거인구 합계'''),
+[비개발 배분 기준 = BAU 격자 비중] ④·⑤ 대신
+   비개발 인구 = P(s,y) − 개발 누적(s,y) 를 그해 BAU 격자 비중으로 배분
+   입주 인구는 누적값 그대로 더하고 다음 시점 비중으로 쓰지 않음
+[근무 원단위] 개발 유입 = 계획인구 × 시군별 근무인구 합계/주거인구 합계
+[근무 총량 조정] 근무 총량 × 시나리오 거주 총량 ÷ 공통 추계 거주 총량'''),
     'center': ('중심지 식별', '''\
 연도별(기준연도 + 거주·근무 공통 pop_YYYY)로:
 ① 격자 분류 — 주거인구 r, 근무인구 w
@@ -605,6 +630,8 @@ class PopAllocDialog(QDialog):
         self.zone_file, self.z_pop_cb, self.z_yr_cb = {}, {}, {}
         self.z_prj_cb, self.z_sgg_cb = {}, {}
         self.plan_out, self.plan_csv = {}, {}
+        self.plan_mode, self.plan_bau = {}, {}
+        self.cohort_out = {}
 
         # ── 레이어 속성창 스타일: 왼쪽 목록 + 오른쪽 페이지 ─
         self.stack = QStackedWidget()
@@ -855,6 +882,8 @@ class PopAllocDialog(QDialog):
             put(self.grid_file.get(d), grid, f'{nm}인구 배분 · 격자')
             put(self.zone_file.get(d), dev, f'{nm}인구 배분 · 개발사업')
         put(self.table_file.get(RES), self._region_file(reg, 'resid_proj'), '거주인구 배분 · 추계 테이블')
+        put(getattr(self, 'cohort_emd', None), emd, '거주인구 배분 · 코호트 읍면동')
+        put(getattr(self, 'cohort_sgis', None), self._region_file(reg, 'sgis_age'), '거주인구 배분 · 코호트 SGIS 성·연령')
         put(getattr(self, 'ctr_emd_file', None), emd, '장래 중심지 식별 · 읍면동')
         put(getattr(self, 'infra_file', None), self._region_file(reg, 'infra_1km'), '거점 유도 · 생활인프라')
         put(getattr(self, 'emp_file', None), self._region_file(reg, 'emp_rate'), '근무인구 추계 · 고용률')
@@ -901,7 +930,9 @@ class PopAllocDialog(QDialog):
                     k['out_html'], k['batch_dir'], k['rep_basic'], k['rep_compact'], k['rep_network'], k['rep_life'],
                     k['zones'], k['centers'], k['od'], k['scen_folder']]
             for d in (RES, WORK):
-                outs += [self.bau_out.get(d), self.plan_out.get(d), self.plan_csv.get(d)]
+                outs += [self.bau_out.get(d), self.plan_out.get(d), self.plan_csv.get(d), self.plan_bau.get(d),
+                         self.cohort_out.get(d)]
+            outs.append(getattr(self, 'plan_table', None))
             for fw in outs:
                 if fw is not None:
                     fw.setFilePath('')
@@ -920,6 +951,8 @@ class PopAllocDialog(QDialog):
                 if os.path.exists(p):
                     filled.append('기존 결과 · ' + rel[1])
 
+        put(getattr(self, 'plan_table', None), self._region_file(reg, 'resid_proj_plan'),
+            '거주인구 배분 · 시나리오 총량 표')
         self._link_scen_folder()
         self._link_kpi_json()
         if add_group:
@@ -982,8 +1015,13 @@ class PopAllocDialog(QDialog):
         for d in (RES, WORK):
             yield f'{d}_zone', self.zone_file[d]
             yield f'{d}_bau_out', self.bau_out[d]
+            yield f'{d}_cohort_out', self.cohort_out[d]
             yield f'{d}_plan_out', self.plan_out[d]
             yield f'{d}_plan_csv', self.plan_csv[d]
+            yield f'{d}_plan_bau', self.plan_bau[d]
+        yield 'res_plan_table', self.plan_table
+        yield 'cohort_emd', self.cohort_emd
+        yield 'cohort_sgis', self.cohort_sgis
         yield 'devw_csv', self.devw_csv
         yield 'ctr_res', self.ctr_res_file
         yield 'ctr_work', self.ctr_work_file
@@ -1059,11 +1097,11 @@ class PopAllocDialog(QDialog):
     # 거주·근무인구 배분 결과 → 종합 리포트가 읽는 시나리오 폴더 양식
     #   시나리오별_장래인구\{BAU·유도정책·계획반영}\{지역명}_{유형}_{연도}.shp
     #   (주거인구 필드 pop_tot, 근무인구 필드 pop_w — 근무 배분 결과가 있을 때)
-    _SCEN_SRC = (('BAU', 'bau', '배분_1_BAU.gpkg'), ('유도정책', 'hub', '배분_2_거점유도.gpkg'),
-                 ('계획반영', 'plan', '배분_3_계획인구.gpkg'))
+    _SCEN_SRC = (('BAU', 'bau', '배분_1_BAU.gpkg'), ('코호트', 'cohort', '배분_1_코호트.gpkg'),
+                 ('유도정책', 'hub', '배분_2_거점유도.gpkg'), ('계획반영', 'plan', '배분_3_계획인구.gpkg'))
     # 시나리오별 근무인구 출처 — 근무는 거점유도 배분이 없으므로 유도정책 시나리오도 BAU 근무인구를 씀
     _SCEN_WORK_SRC = {'bau': ('bau', '배분_1_BAU.gpkg'), 'hub': ('bau', '배분_1_BAU.gpkg'),
-                      'plan': ('plan', '배분_2_계획반영.gpkg')}
+                      'cohort': ('cohort', '배분_1_코호트.gpkg'), 'plan': ('plan', '배분_2_계획반영.gpkg')}
 
     def _link_scen_folder(self, force=False):
         """결과 폴더의 시나리오별_장래인구가 있으면 종합 리포트 칸에 연결 (파일 작업 없음)."""
@@ -1093,7 +1131,7 @@ class PopAllocDialog(QDialog):
         name = name or '지역'
         scen_root = os.path.join(root, out_alloc(RES), '시나리오별_장래인구')
         widgets = {'bau': self.bau_out.get(RES), 'hub': getattr(self, 'hub_out', None),
-                   'plan': self.plan_out.get(RES)}
+                   'plan': self.plan_out.get(RES), 'cohort': self.cohort_out.get(RES)}
         made = []
         work_cache = {}
 
@@ -1102,7 +1140,7 @@ class PopAllocDialog(QDialog):
             kind, wsuffix = self._SCEN_WORK_SRC[wkey]
             if kind in work_cache:
                 return work_cache[kind]
-            wfw = (self.bau_out if kind == 'bau' else self.plan_out).get(WORK)
+            wfw = {'bau': self.bau_out, 'plan': self.plan_out, 'cohort': self.cohort_out}[kind].get(WORK)
             wsrc = wfw.filePath().strip() if wfw is not None else ''
             wroot = self._analysis_root(WORK) or root
             if not wsrc or not os.path.isfile(wsrc):
@@ -3500,6 +3538,44 @@ class PopAllocDialog(QDialog):
         form.addRow('결과 저장 파일', self.bau_out[d])
         form.addRow(self._action_row(
             'bau', 'BAU 배분 실행', lambda _=False, dd=d: self._run_bau(dd)))
+        if d == RES:
+            form.addRow(self._title(
+                '<br><b>코호트 변화율 배분</b> — 읍면동 단위 연령구조·과거 변화율 반영 (BAU 옆 시나리오).<br>'
+                '<span style="color:gray">읍·면 각각 + 동지역 하나, 동만 있는 시군구는 동 각각</span>'))
+            self.cohort_emd = self._open_widget(lambda _p: None)
+            form.addRow('읍면동 경계', self.cohort_emd)
+            self.cohort_sgis = QgsFileWidget()
+            self.cohort_sgis.setFilter('CSV (*.csv)')
+            self.cohort_sgis.setMinimumHeight(28)
+            form.addRow('SGIS 1km 성·연령 인구 표', self.cohort_sgis)
+            prm = QHBoxLayout()
+            prm.setSpacing(10)
+            self.cohort_hl = QDoubleSpinBox()
+            self.cohort_hl.setRange(0.0, 50.0)
+            self.cohort_hl.setSingleStep(0.5)
+            self.cohort_hl.setValue(5.0)
+            self.cohort_pool = QSpinBox()
+            self.cohort_pool.setRange(0, 1000000)
+            self.cohort_pool.setValue(5000)
+            self.cohort_borrow = QSpinBox()
+            self.cohort_borrow.setRange(0, 1000000)
+            self.cohort_borrow.setValue(1000)
+            for lab, wdg in (('반감기(년)', self.cohort_hl), ('남녀 합침(명 미만)', self.cohort_pool),
+                             ('이웃 묶음(명 미만)', self.cohort_borrow)):
+                prm.addWidget(QLabel(lab))
+                prm.addWidget(wdg)
+            prm.addStretch()
+            form.addRow('계산 기준', prm)
+        else:
+            form.addRow(self._title(
+                '<br><b>코호트 연동 배분</b> — 거주 코호트 배분과 같은 단위의 15세 이상 거주인구 변화를 따름.<br>'
+                '<span style="color:gray">거주인구 배분의 코호트 변화율 배분을 먼저 실행</span>'))
+        self.cohort_out[d] = self._save_widget('GeoPackage (*.gpkg)')
+        form.addRow('코호트 결과 저장 파일', self.cohort_out[d])
+        form.addRow(self._action_row(
+            'cohort' if d == RES else 'cohort_w',
+            '코호트 변화율 배분 실행' if d == RES else '코호트 연동 배분 실행',
+            lambda _=False, dd=d: self._run_cohort(dd)))
         return w
 
     # ── 페이지: 거점유도 (거주 전용) ──────────────────────
@@ -3634,6 +3710,22 @@ class PopAllocDialog(QDialog):
                 self.w_res_cb.setLayer(grid)
                 self.w_res_cb.setField('pop_r')
             form.addRow('  ↳ 원단위 분모(주거인구) 필드', self.w_res_cb)
+            self.w_total_adj = QCheckBox(
+                '근무 총량 조정 — 근무 총량 × 시나리오 거주 총량 ÷ 공통 추계 거주 총량')
+            self.w_total_adj.setChecked(True)
+            form.addRow(self.w_total_adj)
+        else:
+            self.plan_table = QgsFileWidget()
+            self.plan_table.setFilter('추계 테이블 (*.csv *.xlsx)')
+            self.plan_table.setMinimumHeight(28)
+            form.addRow('시나리오 총량 표 (비우면 공통 추계 테이블)', self.plan_table)
+
+        self.plan_mode[d] = QComboBox()
+        self.plan_mode[d].addItem('BAU 격자 비중 (입주 인구는 따로 유지)', 1)
+        self.plan_mode[d].addItem('직전 시점 격자 비중 연쇄', 0)
+        form.addRow('비개발 배분 기준', self.plan_mode[d])
+        self.plan_bau[d] = self._open_widget(lambda _p: None)
+        form.addRow('  ↳ BAU 배분 결과 (비우면 코호트 배분 결과, 없으면 BAU 배분 결과)', self.plan_bau[d])
 
         self.plan_out[d] = self._save_widget('GeoPackage (*.gpkg)')
         form.addRow('결과 저장 파일', self.plan_out[d])
@@ -4299,6 +4391,44 @@ class PopAllocDialog(QDialog):
                 self._export_scenarios(('bau', 'hub'))     # 근무 BAU → BAU·유도정책 시나리오에 근무인구 추가
                 self._finish_step('work_bau', 'work_plan')
 
+    def _cohort_csv(self, kind):
+        """거주 코호트 배분의 부속 CSV(단위별 투영·격자-단위 연결) 경로 — 결과 파일과 같은 폴더."""
+        out = self.cohort_out[RES].filePath().strip() or os.path.join(self._default_dir(RES), f'{RES}배분_1_코호트.gpkg')
+        name = '거주코호트_단위별투영.csv' if kind == 'units' else '거주코호트_격자단위연결.csv'
+        return os.path.join(os.path.dirname(out), name)
+
+    def _run_cohort(self, d):
+        try:
+            params = {**self._grid_params(d), 'TABLE': self._table_path(d)}
+        except ValueError as e:
+            QMessageBox.warning(self, '입력 확인', str(e))
+            return
+        params['OUTPUT'] = self._out_path(self.cohort_out[d], f'{d}배분_1_코호트.gpkg', d)
+        js = (self._region or {}).get('json') or {}
+        if d == RES:
+            emd = self.cohort_emd.filePath().strip()
+            sgis = self.cohort_sgis.filePath().strip()
+            if not emd or not sgis or not os.path.isfile(sgis):
+                QMessageBox.warning(self, '입력 확인', '읍면동 경계와 SGIS 1km 성·연령 인구 표를 지정하세요.')
+                return
+            bnd = js.get('data', {}).get('boundary') or {}
+            params.update({'EMD': emd, 'EMD_CODE': bnd.get('emd_code') or 'ADM_CD',
+                           'EMD_NAME': bnd.get('emd_name') or 'ADM_NM', 'SGIS': sgis,
+                           'HALF_LIFE': self.cohort_hl.value(), 'POOL_SEX_POP': self.cohort_pool.value(),
+                           'BORROW_POP': self.cohort_borrow.value(), 'BASE_YEAR': int(js.get('base_year') or 2023),
+                           'OUT_UNITS': self._cohort_csv('units'), 'OUT_LINKS': self._cohort_csv('links')})
+            alg = 'krihs_ssim:cohort_grid_allocate'
+        else:
+            units, links = self._cohort_csv('units'), self._cohort_csv('links')
+            if not (os.path.isfile(units) and os.path.isfile(links)):
+                QMessageBox.warning(self, '입력 확인', '거주인구 배분 > ① BAU 배분에서 코호트 변화율 배분을 먼저 실행하세요.')
+                return
+            params.update({'UNITS': units, 'LINKS': links})
+            alg = 'krihs_ssim:cohort_work_allocate'
+        if self._run(alg, params):
+            self._add_result_group(params['OUTPUT'], f'{d}_코호트_배분')
+            self._export_scenarios('cohort')      # 거주 → 코호트 시나리오, 근무 → 근무인구 열 추가
+
     def _run_policy(self):
         try:
             grid = self._grid_params(RES)
@@ -4349,9 +4479,42 @@ class PopAllocDialog(QDialog):
             self._export_scenarios('hub')
             self._finish_step('res_hub', 'res_plan')
 
+    def _plan_table_path(self, d):
+        """계획인구 반영 배분의 총량 표 — 거주는 시나리오 총량 표, 근무는 거주가 늘어난 비율만큼 조정."""
+        from . import core
+        base = self._table_path(d)
+        plan = self.plan_table.filePath().strip()
+        if not plan:
+            return base
+        if d == RES:
+            return plan
+        if not self.w_total_adj.isChecked():
+            return base
+        out = os.path.join(self._default_dir(WORK), '추계_근무인구_계획반영.csv')
+        core.scale_sgg_table(base, plan, self._table_path(RES), out)
+        self._log.appendPlainText(f'[연결] 근무 시나리오 총량 표 저장: {out}')
+        return out
+
+    def _plan_bau_path(self, d):
+        """비개발 배분 기준 레이어 — 지정한 파일, 없으면 코호트 배분 결과, 그것도 없으면 BAU 배분 결과."""
+        path = self.plan_bau[d].filePath().strip()
+        if not path:
+            for fw, fn in ((self.cohort_out[d], f'{d}배분_1_코호트.gpkg'), (self.bau_out[d], f'{d}배분_1_BAU.gpkg')):
+                cand = fw.filePath().strip() or os.path.join(self._default_dir(d), fn)
+                if os.path.isfile(cand):
+                    path = cand
+                    break
+        if not path or not os.path.isfile(path):
+            raise ValueError(f'{d}인구 코호트 또는 BAU 격자 배분을 먼저 실행하거나 BAU 배분 결과를 지정하세요.')
+        self._log.appendPlainText(f'[연결] 계획인구 반영 배분 · 비개발 배분 기준 ← {path}')
+        return path
+
     def _run_plan(self, d):
         try:
-            params = {**self._grid_params(d), 'TABLE': self._table_path(d)}
+            params = {**self._grid_params(d), 'TABLE': self._plan_table_path(d)}
+            params['NONDEV_MODE'] = self.plan_mode[d].currentData()
+            if params['NONDEV_MODE'] == 1:
+                params['BAU_LAYER'] = self._plan_bau_path(d)
         except ValueError as e:
             QMessageBox.warning(self, '입력 확인', str(e))
             return

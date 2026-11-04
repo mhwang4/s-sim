@@ -11,9 +11,9 @@ S-Sim 플러그인의 분석 기능을 MCP(Model Context Protocol) 서버로 노
 |---|---|
 | `check_environment` | QGIS·플러그인 버전, 알고리즘 수, 데이터팩 위치·지역, mcp 설치 여부 점검 |
 | `list_regions` | 데이터팩의 지역 목록, 지역별 입력 파일 경로·존재 여부, 이미 만든 분석 결과 |
-| `list_algorithms` | 알고리즘 17종 목록 (id·이름·그룹) |
+| `list_algorithms` | 알고리즘 19종 목록 (id·이름·그룹) |
 | `describe_algorithm` | 알고리즘 1개의 파라미터 명세와 설명 |
-| `run_algorithm` | 알고리즘 1개 실행 (17종 전부). 입력 사전 검사, 진행률 보고, 결과 요약, 실행 이력. OD 알고리즘(격자→중심지·중심지 간)은 전체·성공·실패 쌍 수(`od_pairs`)를 함께 돌려주고, 거리가 계산되지 않은 쌍(도달불가)이 있으면 경고 |
+| `run_algorithm` | 알고리즘 1개 실행 (19종 전부). 입력 사전 검사, 진행률 보고, 결과 요약, 실행 이력. OD 알고리즘(격자→중심지·중심지 간)은 전체·성공·실패 쌍 수(`od_pairs`)를 함께 돌려주고, 거리가 계산되지 않은 쌍(도달불가)이 있으면 경고 |
 | `run_pipeline` | **플러그인 전체 흐름을 메뉴 순서대로 실행** — 장래인구 배분 → 장래 중심지 식별 → 중심지·생활권 ①~⑤ → KPI 일괄 산출·리포트 → 3D. 단계를 골라 실행할 수 있고, 최소 밀도·도시위상·시설 기준을 인자로 바꾼다 |
 | `run_kpi` | KPI만 산출(일괄 또는 단계) + 종합 리포트 |
 | `job_status` / `cancel_job` | `run_pipeline`·`run_kpi` 작업의 진행 상황·결과 확인 / 중지 |
@@ -66,7 +66,7 @@ QGIS가 기본 경로(`C:\Program Files\QGIS x.y.z`)에 없으면 환경변수 `
 mcp_server\run_server.bat --selftest
 ```
 
-환경 점검, 지역 목록, 알고리즘 목록·명세, 도움말, 입력 오류 안내를 확인한다(분석은 실행하지 않음). `selftest OK — 17 algorithms, 4 guide topics`가 나오면 정상이다. `--selftest --full`은 KPI 일괄 산출까지 실행한다(수 분 소요).
+환경 점검, 지역 목록, 알고리즘 목록·명세, 도움말, 입력 오류 안내를 확인한다(분석은 실행하지 않음). `selftest OK — 19 algorithms, 4 guide topics`가 나오면 정상이다. `--selftest --full`은 KPI 일괄 산출까지 실행한다(수 분 소요).
 
 ## 사용 예 (Claude 대화창)
 

@@ -10,6 +10,9 @@ MCP 서버(server.py)가 별도 프로세스로 실행한다:  python pipeline_r
   steps: ["population", "future_centers", "centers_zones", "kpi", "viz"] 중 일부(순서대로 실행)
   min_density(100·150·200·300), city_type(거점·강소·자립), use_work_criteria(bool),
   dedup_by_emd(bool, 기본 True), min_center_dist(m, 기본 1500, 0=미적용) — 중심지 후보 추출·장래 중심지 식별 공통,
+  nondev_mode(1=BAU 격자 비중·기본, 0=직전 시점 연쇄), bau_res·bau_work(BAU 배분 결과, 비우면 BAU 실행 결과),
+  plan_table(시나리오 총량 표, 생략하면 데이터팩 값, ''이면 공통 추계 표), work_total_adj(bool, 기본 True) — 계획인구 반영 배분,
+  cohort(bool, 기본 True) — 코호트 변화율 배분(거주)·코호트 연동 배분(근무) 실행, half_life(년, 기본 5),
   kpi_scope(all·basic·compact·network·life), fac_radius, fac_minpop, fac_radius_hub, fac_minpop_hub
 """
 import json
@@ -118,15 +121,35 @@ ok = run_step('분석 지역 설정', apply_region, 'region')
 root = d._region_result_root() if ok else None
 steps = CFG.get('steps') or []
 
+def plan_options():
+    """계획인구 반영 배분 화면의 선택(비개발 배분 기준·BAU 결과·시나리오 총량)."""
+    for dom, key in ((DM.RES, 'bau_res'), (DM.WORK, 'bau_work')):
+        if CFG.get('nondev_mode') is not None:
+            d.plan_mode[dom].setCurrentIndex(d.plan_mode[dom].findData(int(CFG['nondev_mode'])))
+        if CFG.get(key):
+            d.plan_bau[dom].setFilePath(CFG[key])
+    if CFG.get('plan_table') is not None:
+        d.plan_table.setFilePath(CFG['plan_table'])
+    if CFG.get('work_total_adj') is not None:
+        d.w_total_adj.setChecked(bool(CFG['work_total_adj']))
+
+
 if ok and 'population' in steps:
     run_step('거주 ① BAU 배분', lambda: d._run_bau(DM.RES), 'res_bau')
+    COHORT = bool(CFG.get('cohort', True))
+    if COHORT:
+        if CFG.get('half_life') is not None:
+            d.cohort_hl.setValue(float(CFG['half_life']))
+        run_step('거주 ① 코호트 변화율 배분', lambda: d._run_cohort(DM.RES), 'res_bau')
     run_step('거주 ② 정책관심구역 산출', d._run_policy, 'res_hub')
     run_step('거주 ② 거점유도 배분', d._run_hub, 'res_hub')
-    run_step('거주 ③ 계획인구 반영 배분', lambda: d._run_plan(DM.RES), 'res_plan')
+    run_step('거주 ③ 계획인구 반영 배분', lambda: (plan_options(), d._run_plan(DM.RES)), 'res_plan')
     run_step('근무 공통 데이터', lambda: None, 'work_common')
     run_step('근무 장래 근무인구 추계', d._run_wproj, 'work_proj')
     run_step('근무 ① BAU 배분', lambda: d._run_bau(DM.WORK), 'work_bau')
-    run_step('근무 ② 계획인구 반영 배분', lambda: d._run_plan(DM.WORK), 'work_plan')
+    if COHORT:
+        run_step('근무 ① 코호트 연동 배분', lambda: d._run_cohort(DM.WORK), 'work_bau')
+    run_step('근무 ② 계획인구 반영 배분', lambda: (plan_options(), d._run_plan(DM.WORK)), 'work_plan')
 
 DEDUP = bool(CFG.get('dedup_by_emd', True))
 MIN_DIST = float(CFG.get('min_center_dist', 1500) or 0)

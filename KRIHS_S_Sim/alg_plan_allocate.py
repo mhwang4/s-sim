@@ -8,6 +8,10 @@
   3단계  개발지구 인구는 사업지구와 중첩되는 격자에 균등 배분
   4단계  2+3 합산 결과를 다음 목표연도의 격자인구 비중으로 연쇄
          (이전 연도 개발지구는 거주지화되어 다음 연도 비개발 배분에 포함)
+
+비개발 배분 기준을 BAU 레이어로 고르면 2·4단계가 다음과 같이 바뀐다.
+  비개발지구 인구 = 시군 추계 총량 − 개발지구 누적 인구, 그해 BAU 격자 비중으로 배분
+  개발지구 인구는 입주 뒤 누적값 그대로 유지 (앞 시점 결과를 비중으로 연쇄하지 않음)
 """
 import csv
 
@@ -16,6 +20,7 @@ from qgis.core import (
     QgsProcessing,
     QgsProcessingAlgorithm,
     QgsProcessingException,
+    QgsProcessingParameterEnum,
     QgsProcessingParameterFeatureSink,
     QgsProcessingParameterField,
     QgsProcessingParameterFile,
@@ -42,6 +47,9 @@ class PlanAllocateAlgorithm(QgsProcessingAlgorithm):
     Z_PRJ_FIELD = 'Z_PRJ_FIELD'
     Z_SGG_FIELD = 'Z_SGG_FIELD'
     RATIO_FIELD = 'RATIO_FIELD'
+    NONDEV_MODE = 'NONDEV_MODE'
+    BAU_LAYER = 'BAU_LAYER'
+    BAU_GID_FIELD = 'BAU_GID_FIELD'
     OUTPUT = 'OUTPUT'
     OUT_SPLIT_CSV = 'OUT_SPLIT_CSV'
 
@@ -131,6 +139,25 @@ class PlanAllocateAlgorithm(QgsProcessingAlgorithm):
             type=QgsProcessingParameterField.Numeric,
             optional=True,
         ))
+        self.addParameter(QgsProcessingParameterEnum(
+            self.NONDEV_MODE,
+            '비개발 배분 기준',
+            options=['직전 시점 격자 비중 연쇄', 'BAU 레이어 격자 비중'],
+            defaultValue=0,
+        ))
+        self.addParameter(QgsProcessingParameterVectorLayer(
+            self.BAU_LAYER,
+            'BAU 배분 결과 (BAU 레이어 격자 비중을 고를 때 — 격자 + pop_YYYY 또는 pop_w_YYYY)',
+            types=[QgsProcessing.TypeVectorPolygon],
+            optional=True,
+        ))
+        self.addParameter(QgsProcessingParameterField(
+            self.BAU_GID_FIELD,
+            '↳ 격자 ID 필드 (기본: gid)',
+            defaultValue='gid',
+            parentLayerParameterName=self.BAU_LAYER,
+            optional=True,
+        ))
         self.addParameter(QgsProcessingParameterFeatureSink(
             self.OUTPUT,
             '계획인구 배분 결과',
@@ -155,7 +182,13 @@ class PlanAllocateAlgorithm(QgsProcessingAlgorithm):
             'sgg': self.parameterAsString(parameters, self.Z_SGG_FIELD, context),
         }
         ratio_field = self.parameterAsString(parameters, self.RATIO_FIELD, context)
+        nondev_mode = self.parameterAsEnum(parameters, self.NONDEV_MODE, context)
+        bau_layer = self.parameterAsVectorLayer(parameters, self.BAU_LAYER, context)
+        bau_gid = self.parameterAsString(parameters, self.BAU_GID_FIELD, context) or 'gid'
         split_csv = self.parameterAsFileOutput(parameters, self.OUT_SPLIT_CSV, context)
+        if nondev_mode == 1 and bau_layer is None:
+            raise QgsProcessingException(
+                '비개발 배분 기준이 BAU 레이어 격자 비중이면 BAU 배분 결과를 지정해야 합니다.')
 
         # ── [1단계] 추계 테이블 로드 (0~10) ────────────────
         feedback.pushInfo('━' * 50)
@@ -176,6 +209,10 @@ class PlanAllocateAlgorithm(QgsProcessingAlgorithm):
         n_grid = sum(len(v) for v in groups.values())
         feedback.pushInfo(f'  → {n_grid:,}개 격자, {len(groups)}개 시군구')
         validate_sgg_match(groups.keys(), table.keys(), '추계 테이블', feedback)
+        bau = None
+        if nondev_mode == 1:
+            bau = self._load_bau(bau_layer, bau_gid, years,
+                                 {g['gid'] for v in groups.values() for g in v}, feedback)
         feedback.setProgress(25)
 
         # ── [3단계] 개발지구 인구 산출 (25~45) ─────────────
@@ -187,6 +224,9 @@ class PlanAllocateAlgorithm(QgsProcessingAlgorithm):
         dev_total, dev_alloc = self._process_zones(
             layer, zone_layer, years, feedback,
             gid_field, sgg_field, zone_fields, unit)
+        if bau is not None:   # BAU 비중 방식: 입주 인구는 누적으로 따로 둔다
+            dev_total = self._cumulate(dev_total, years)
+            dev_alloc = self._cumulate(dev_alloc, years)
         for yr in years:
             tot = sum(v.get(yr, 0.0) for v in dev_total.values())
             feedback.pushInfo(f'  {yr}년: 개발지구 인구 {tot:,.0f}명')
@@ -222,6 +262,8 @@ class PlanAllocateAlgorithm(QgsProcessingAlgorithm):
 
             weights = {g['gid']: g['pop0'] for g in grids}
             for yr in years:
+                if bau is not None:
+                    weights = {g['gid']: bau[g['gid']][yr] for g in grids}
                 dev, nondev = split[sgg][yr]
                 result, equal = core.allocate_by_weight(weights, nondev)
                 if equal:
@@ -232,13 +274,13 @@ class PlanAllocateAlgorithm(QgsProcessingAlgorithm):
                 for gid, pop in result.items():
                     allocated.setdefault(gid, {})[yr] = pop
                 # 다음 목표연도 가중치 = 이번 배분 결과 (개발지구 거주지화 포함)
-                if sum(result.values()) > 0:
+                if bau is None and sum(result.values()) > 0:
                     weights = dict(result)
 
         # ── [6단계] 출력 (80~99) ───────────────────────────
         feedback.pushInfo('━' * 50)
         feedback.pushInfo('[6단계] 결과 출력')
-        self._write_split_csv(split_csv, split, years)
+        self._write_split_csv(split_csv, split, years, 'dev' if bau is None else 'devcum')
         feedback.pushInfo(f'  → 분배 CSV: {split_csv}')
 
         dest_id, n_written = write_grid_sink(
@@ -251,6 +293,47 @@ class PlanAllocateAlgorithm(QgsProcessingAlgorithm):
             self.OUTPUT: dest_id,
             self.OUT_SPLIT_CSV: split_csv,
         }
+
+    # ── BAU 비중 방식 ─────────────────────────────────────
+    @staticmethod
+    def _load_bau(layer, gid_field, years, grid_gids, feedback):
+        """BAU 배분 결과 → {gid: {yr: 인구}}. 연도 필드는 pop_YYYY, 없으면 pop_w_YYYY."""
+        require_fields(layer, (gid_field,), 'BAU 배분 결과')
+        names = layer.fields().names()
+        prefix = next((p for p in ('pop_', 'pop_w_')
+                       if all(f'{p}{yr}' in names for yr in years)), None)
+        if prefix is None:
+            raise QgsProcessingException(
+                'BAU 배분 결과에 추계 테이블의 목표연도 필드(pop_YYYY 또는 pop_w_YYYY)가 '
+                f'모두 있어야 합니다: {", ".join(map(str, years))}')
+        bau = {}
+        for feat in layer.getFeatures():
+            vals = {}
+            for yr in years:
+                try:
+                    vals[yr] = float(feat[f'{prefix}{yr}'])
+                except (TypeError, ValueError):
+                    vals[yr] = 0.0
+            bau[str(feat[gid_field]).strip()] = vals
+        missing = grid_gids - set(bau)
+        if missing:
+            raise QgsProcessingException(
+                f'BAU 배분 결과에 없는 격자가 {len(missing):,}개 있습니다 (예: {min(missing)}). '
+                '같은 격자로 만든 BAU 결과를 지정하세요.')
+        feedback.pushInfo(f'  → BAU 비중 필드: {prefix}YYYY, 격자 {len(bau):,}개')
+        return bau
+
+    @staticmethod
+    def _cumulate(per, years):
+        """{키: {yr: 기간 값}} → {키: {yr: 누적 값}}."""
+        out = {}
+        for key, vals in per.items():
+            acc = 0.0
+            out[key] = {}
+            for yr in years:
+                acc += vals.get(yr, 0.0)
+                out[key][yr] = acc
+        return out
 
     # ── 원단위 (근무인구 배분용) ──────────────────────────
     @staticmethod
@@ -431,11 +514,11 @@ class PlanAllocateAlgorithm(QgsProcessingAlgorithm):
 
     # ── 보조 CSV 출력 ─────────────────────────────────────
     @staticmethod
-    def _write_split_csv(path, split, years):
+    def _write_split_csv(path, split, years, dev_name='dev'):
         with open(path, 'w', encoding='utf-8-sig', newline='') as f:
             w = csv.writer(f)
             header = ['sgg_cd_h']
-            header += [f'dev_{yr}' for yr in years]
+            header += [f'{dev_name}_{yr}' for yr in years]
             header += [f'ndev_{yr}' for yr in years]
             w.writerow(header)
             for sgg in sorted(split):
@@ -467,9 +550,14 @@ class PlanAllocateAlgorithm(QgsProcessingAlgorithm):
             '  3) 개발 인구를 사업지구 교차 격자에 균등 배분\n'
             '  4) 합산 결과가 다음 목표연도의 배분 가중치로 연쇄\n'
             '     (이전 연도 개발지구는 거주지화되어 비개발 배분에 포함)\n\n'
+            '━ 비개발 배분 기준을 BAU 레이어 격자 비중으로 고르면\n'
+            '  2) 비개발 인구(총량−개발 누적)를 그해 BAU 격자 비중에 비례 배분\n'
+            '  4) 입주 인구는 누적값 그대로 더하고, 결과를 다음 시점 비중으로 쓰지 않음\n'
+            '  ※ 개발 사업이 없고 총량이 BAU 합계와 같으면 결과는 BAU와 같음\n\n'
             '━ 출력\n'
             '  · 배분 결과 레이어: 입력 필드 + pop_YYYY\n'
-            '  · 분배 CSV: sgg_cd_h, dev_YYYY(개발), ndev_YYYY(비개발)\n\n'
+            '  · 분배 CSV: sgg_cd_h, dev_YYYY(개발, BAU 비중이면 devcum_YYYY 누적), '
+            'ndev_YYYY(비개발)\n\n'
             '━ 연계\n'
             '  비교 도구: 1. BAU 격자 배분 / 2. 거점유도 격자 배분'
         )
