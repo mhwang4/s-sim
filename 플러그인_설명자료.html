@@ -301,7 +301,7 @@ main section.sec .wrap{width:auto;margin:0}
     <tr><td>00_경계</td><td>GPKG</td><td>필수</td><td class="wrap"><span class="nb">계획권역 ·</span> <span class="nb">시군구 27 ·</span> <span class="nb">읍면동 394</span></td></tr>
     <tr><td>01_격자</td><td>GPKG</td><td>필수</td><td class="wrap">국토공간거점지도 1km 격자 16,113개 <span class="nb">(2023)</span></td></tr>
     <tr><td>02_생활인프라</td><td>GPKG</td><td>필수</td><td class="wrap">생활인프라 충족도 500m · <span class="nb">1km</span></td></tr>
-    <tr><td>03_인구추계</td><td>CSV/XLSX</td><td>필수</td><td class="wrap"><span class="nb">시군구 거주인구 추계 ·</span> <span class="nb">15세 이상 장래인구 ·</span> <span class="nb">고용률</span></td></tr>
+    <tr><td>03_인구추계</td><td>CSV/XLSX</td><td>필수</td><td class="wrap">시군구 거주인구 추계(통계청 · <span class="nb">계획인구) ·</span> <span class="nb">15세 이상 장래인구 ·</span> <span class="nb">고용률 ·</span> SGIS 1km 성·연령(2000~2020, <span class="nb">코호트 배분 입력)</span></td></tr>
     <tr><td>04_개발사업</td><td>GPKG</td><td>선택</td><td class="wrap"><span class="nb">개발사업 지구 76건</span></td></tr>
     <tr><td>05_시설</td><td>GPKG</td><td>필수</td><td class="wrap"><span class="nb">근린시설 5종 ·</span> <span class="nb">거점시설 5종</span></td></tr>
     <tr><td>06_탄소</td><td>CSV</td><td>선택</td><td class="wrap"><span class="nb">격자 탄소 총배출</span> <span class="nb">(2023)</span></td></tr>
@@ -1391,10 +1391,10 @@ main section.sec .wrap{width:auto;margin:0}
     <tr><th>도구</th><th>기능</th></tr>
     <tr><td>check_environment</td><td class="wrap"><span class="nb">설치 상태 점검</span></td></tr>
     <tr><td>list_regions</td><td class="wrap"><span class="nb">데이터팩 지역 목록 ·</span> <span class="nb">입력 파일 확인</span></td></tr>
-    <tr><td>list_algorithms</td><td class="wrap"><span class="nb">알고리즘 17종 목록</span></td></tr>
+    <tr><td>list_algorithms</td><td class="wrap"><span class="nb">알고리즘 19종 목록</span></td></tr>
     <tr><td>describe_algorithm</td><td class="wrap"><span class="nb">알고리즘 파라미터 설명</span></td></tr>
     <tr><td>run_algorithm</td><td class="wrap"><span class="nb">알고리즘 1개 실행</span></td></tr>
-    <tr><td>run_pipeline</td><td class="wrap"><b>플러그인 전체 흐름을 메뉴 순서대로</b> - <span class="nb">장래인구 배분 →</span> <span class="nb">장래 중심지 →</span> <span class="nb">중심지-생활권 ①~⑤ →</span> <span class="nb">KPI·리포트 →</span> <span class="nb">3D.</span> <span class="nb">단계 선택,</span> <span class="nb">기준값 변경 가능</span> <span class="nb">(전체 약 15분)</span></td></tr>
+    <tr><td>run_pipeline</td><td class="wrap"><b>플러그인 전체 흐름을 메뉴 순서대로</b> - <span class="nb">장래인구 배분(BAU ·</span> <span class="nb">코호트 ·</span> <span class="nb">거점유도 ·</span> <span class="nb">계획인구) →</span> <span class="nb">장래 중심지 →</span> <span class="nb">중심지-생활권 ①~⑤ →</span> <span class="nb">KPI·리포트 →</span> <span class="nb">3D.</span> <span class="nb">단계 선택,</span> <span class="nb">기준값 변경 가능</span> <span class="nb">(전체 약 15분)</span></td></tr>
     <tr><td>run_kpi</td><td class="wrap"><span class="nb">KPI 산출 +</span> <span class="nb">종합 리포트</span></td></tr>
     <tr><td>job_status · cancel_job</td><td class="wrap"><span class="nb">진행 확인 ·</span> <span class="nb">중지</span></td></tr>
     <tr><td>guide</td><td class="wrap"><span class="nb">도움말 -</span> <span class="nb">분석 흐름,</span> <span class="nb">중심지·생활권 기준,</span> <span class="nb">KPI 해석,</span> <span class="nb">입력자료·결과 폴더</span></td></tr>
